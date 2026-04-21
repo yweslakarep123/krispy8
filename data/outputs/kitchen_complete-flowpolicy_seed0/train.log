@@ -1,0 +1,7 @@
+[2026-04-18 10:39:19,533][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.535950e+07
+[2026-04-18 10:43:45,840][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.535950e+07
+[2026-04-18 10:43:46,445][httpx][INFO] - HTTP Request: GET https://huggingface.co/api/datasets?author=farama-minari&search=kitchen-complete "HTTP/1.1 200 OK"
+[2026-04-18 10:47:32,986][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.535950e+07
+[2026-04-18 10:47:33,811][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+[2026-04-18 10:58:58,353][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.535950e+07
+[2026-04-18 10:58:59,687][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'

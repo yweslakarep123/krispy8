@@ -1,0 +1,128 @@
+# cmd: /home/daffa/miniforge3/envs/flowp/bin/python infer_kitchen.py --checkpoint /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/checkpoints/latest.ckpt --episodes 50 --device cuda:0 --output-subdir inference_ep50
+[LowdimEncoder] state_dim=70 out_channel=64 hidden_dims=(256, 256)
+----------------------------------
+Class name: FlowPolicyLowdim
+  Number of parameters: 70.9660M
+   _dummy_variable: 0.0000M (0.00%)
+   obs_encoder: 0.1014M (0.14%)
+   model: 70.8645M (99.86%)
+   mask_generator: 0.0000M (0.00%)
+----------------------------------
+Checkpoint : /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/checkpoints/latest.ckpt
+Output     : /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50
+Episodes   : 50
+Device     : cuda:0
+Menjalankan rollout...
+Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/50 [00:00<?, ?it/s]Eval FrankaKitchen-v1 [kitchen_complete]:   8%|▊         | 4/50 [00:06<01:09,  1.50s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  16%|█▌        | 8/50 [00:11<01:01,  1.46s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  24%|██▍       | 12/50 [00:17<00:53,  1.40s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  32%|███▏      | 16/50 [00:22<00:46,  1.38s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  40%|████      | 20/50 [00:27<00:41,  1.37s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  48%|████▊     | 24/50 [00:33<00:35,  1.35s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  56%|█████▌    | 28/50 [00:38<00:29,  1.32s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  64%|██████▍   | 32/50 [00:43<00:23,  1.33s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  72%|███████▏  | 36/50 [00:48<00:18,  1.31s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  80%|████████  | 40/50 [00:54<00:13,  1.32s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  88%|████████▊ | 44/50 [00:59<00:07,  1.31s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  96%|█████████▌| 48/50 [01:04<00:02,  1.31s/it]                                                                                         [KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_000.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_001.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_002.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_003.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_004.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_005.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_006.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_007.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_008.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_009.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_010.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_011.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_012.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_013.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_014.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_015.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_016.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_017.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_018.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_019.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_020.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_021.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_022.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_023.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_024.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_025.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_026.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_027.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_028.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_029.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_030.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_031.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_032.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_033.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_034.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_035.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_036.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_037.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_038.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_039.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_040.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_041.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_042.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_043.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_044.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_045.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_046.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_047.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_048.mp4
+[KitchenRunner] saved video: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_049.mp4
+test_mean_score (kitchen success frac): 0.0050
+mean completed tasks per ep: 0.02 / 4
+
+========== HASIL INFERENSI ==========
+Success rate (rata-rata fraksi task selesai per episode): 0.0050
+Mean inference latency (detik per langkah kontrol / per predict_action): 0.007105 s
+Mean inference latency: 7.105 ms
+Mean completed tasks per episode: 0.02
+Metrik tersimpan di: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/metrics.json
+Video tersimpan:
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_000.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_001.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_002.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_003.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_004.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_005.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_006.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_007.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_008.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_009.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_010.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_011.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_012.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_013.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_014.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_015.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_016.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_017.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_018.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_019.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_020.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_021.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_022.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_023.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_024.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_025.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_026.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_027.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_028.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_029.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_030.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_031.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_032.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_033.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_034.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_035.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_036.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_037.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_038.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_039.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_040.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_041.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_042.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_043.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_044.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_045.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_046.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_047.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_048.mp4
+  - /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_02_seed101/inference_ep50/videos/episode_049.mp4
+=====================================
+

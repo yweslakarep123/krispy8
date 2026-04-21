@@ -1,0 +1,11 @@
+*.pth
+*.pt
+*.ckpt
+*.zarr
+*.hdf5
+*.pkl
+*.mp4
+*.wandb
+*.ckpt
+venv/
+__pycache__/

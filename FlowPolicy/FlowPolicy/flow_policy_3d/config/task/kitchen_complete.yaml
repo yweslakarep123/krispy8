@@ -1,0 +1,58 @@
+name: kitchen_complete
+
+task_name: kitchen_complete
+
+# FrankaKitchen-v1 with the 4 tasks contained in `kitchen-complete-v1`.
+tasks_to_complete:
+  - microwave
+  - kettle
+  - light switch
+  - slide cabinet
+
+# obs_dim (59) + flattened desired_goal dim (kettle 7 + light switch 2 +
+# microwave 1 + slide cabinet 1 = 11) = 70. Action dim = 9.
+shape_meta: &shape_meta
+  obs:
+    agent_pos:
+      shape: [70]
+      type: low_dim
+  action:
+    shape: [9]
+
+env_runner:
+  _target_: flow_policy_3d.env_runner.kitchen_runner.KitchenRunner
+  eval_episodes: 20
+  max_steps: 280
+  n_obs_steps: ${n_obs_steps}
+  n_action_steps: ${n_action_steps}
+  fps: 10
+  task_name: ${task.task_name}
+  tasks_to_complete: ${task.tasks_to_complete}
+  record_video: true
+  max_video_episodes: 2
+  # Set save_videos_dir (path string) for offline inference; null = do not write files
+  save_videos_dir: null
+  wandb_log: true
+
+dataset:
+  _target_: flow_policy_3d.dataset.kitchen_dataset.KitchenDataset
+  dataset_id: D4RL/kitchen/complete-v2
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.02
+  max_train_episodes: null
+  download: true
+  # Urutan sub-task: dipakai untuk (a) mengurutkan layout vektor goal
+  # agent_pos, (b) memfilter episode demonstrasi yang tidak menyelesaikan
+  # keempat task dalam urutan ini.
+  tasks_to_complete: ${task.tasks_to_complete}
+  enforce_task_order: true
+  # Augmentasi data (hanya diterapkan di split training, bukan validasi):
+  #   obs_noise_std  -> Gaussian noise di 59 dim observation (robot-state)
+  #   action_noise_std -> Gaussian noise pada target action
+  # Boleh di-override via command line Hydra saat sweep.
+  obs_noise_std: 0.01
+  action_noise_std: 0.0
+  normalizer_mode: limits
