@@ -132,6 +132,25 @@ warnings.filterwarnings("ignore")
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
+# #region agent log
+def _debug_log_wandb(run_id, hypothesis_id, location, message, data):
+    import json
+    payload = {
+        "sessionId": "ba3d25",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open("debug-ba3d25.log", "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+# #endregion
+
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
     exclude_keys = tuple()
@@ -247,16 +266,67 @@ class TrainFlowPolicyWorkspace:
         cprint(f"[WandB] name: {cfg.logging.name}", "yellow")
         cprint("-----------------------------", "yellow")
         # configure logging
+        # #region agent log
+        _debug_log_wandb(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H4",
+            location="train.py:before-wandb-init",
+            message="snapshot before wandb.init",
+            data={
+                "self_output_dir": str(self.output_dir),
+                "cfg_output_dir": str(getattr(cfg, "output_dir", None)),
+                "hydra_runtime_output_dir": str(HydraConfig.get().runtime.output_dir),
+                "wandb_log_dir_arg": str(self.output_dir),
+                "wandb_logging_id": str(getattr(cfg.logging, "id", None)),
+                "wandb_logging_resume": str(getattr(cfg.logging, "resume", None)),
+            }
+        )
+        # #endregion
         wandb_run = wandb.init(
             dir=str(self.output_dir),
             config=OmegaConf.to_container(cfg, resolve=True),
             **cfg.logging
         )
+        # #region agent log
+        _debug_log_wandb(
+            run_id="pre-fix",
+            hypothesis_id="H1_H4",
+            location="train.py:after-wandb-init",
+            message="state right after wandb.init",
+            data={
+                "wandb_run_id": str(getattr(wandb_run, "id", None)),
+                "wandb_run_name": str(getattr(wandb_run, "name", None)),
+                "wandb_cfg_output_dir_pre_update": str(wandb.config.get("output_dir", None)),
+            }
+        )
+        # #endregion
+        # #region agent log
+        _debug_log_wandb(
+            run_id="pre-fix",
+            hypothesis_id="H2",
+            location="train.py:before-config-update",
+            message="value that will be written by wandb.config.update",
+            data={
+                "update_output_dir_value": str(self.output_dir),
+            }
+        )
+        # #endregion
         wandb.config.update(
             {
                 "output_dir": self.output_dir,
             }
         )
+        # #region agent log
+        _debug_log_wandb(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H4",
+            location="train.py:after-config-update",
+            message="wandb.config.update completed without exception",
+            data={
+                "wandb_cfg_output_dir_post_update": str(wandb.config.get("output_dir", None)),
+            }
+        )
+        # #endregion
 
         # configure checkpoint
         topk_manager = TopKCheckpointManager(
