@@ -133,8 +133,6 @@ warnings.filterwarnings("ignore")
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
 # #region agent log
-_DBG_LOG_PATH = os.path.join(os.getcwd(), "debug-ba3d25.log")
-
 def _debug_log_wandb(run_id, hypothesis_id, location, message, data):
     import json
     payload = {
@@ -147,31 +145,7 @@ def _debug_log_wandb(run_id, hypothesis_id, location, message, data):
         "timestamp": int(time.time() * 1000),
     }
     try:
-        with open(_DBG_LOG_PATH, "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-
-
-def _dbg_breadcrumb(tag, hypothesis_id="CXA_ABORT", extra=None):
-    import json, sys
-    msg = f"[DBG-ba3d25] {tag}"
-    try:
-        sys.stdout.write(msg + "\n")
-        sys.stdout.flush()
-    except Exception:
-        pass
-    try:
-        payload = {
-            "sessionId": "ba3d25",
-            "runId": "post-wandb-fix",
-            "hypothesisId": hypothesis_id,
-            "location": f"train.py:{tag}",
-            "message": msg,
-            "data": extra or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with open(_DBG_LOG_PATH, "a", encoding="utf-8") as _f:
+        with open("debug-ba3d25.log", "a", encoding="utf-8") as _f:
             _f.write(json.dumps(payload) + "\n")
     except Exception:
         pass
@@ -182,15 +156,6 @@ class TrainFlowPolicyWorkspace:
     exclude_keys = tuple()
 
     def __init__(self, cfg: OmegaConf, output_dir=None):
-        # #region agent log
-        _dbg_breadcrumb("workspace.__init__:enter", extra={
-            "MUJOCO_GL": os.environ.get("MUJOCO_GL"),
-            "PYOPENGL_PLATFORM": os.environ.get("PYOPENGL_PLATFORM"),
-            "DISPLAY": os.environ.get("DISPLAY"),
-            "LD_PRELOAD": os.environ.get("LD_PRELOAD"),
-            "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES"),
-        })
-        # #endregion
         self.cfg = cfg
         self._output_dir = output_dir
         self._saving_thread = None
@@ -201,14 +166,8 @@ class TrainFlowPolicyWorkspace:
         np.random.seed(seed)
         random.seed(seed)
 
-        # #region agent log
-        _dbg_breadcrumb("workspace.__init__:before-instantiate-policy", hypothesis_id="H5")
-        # #endregion
         # configure model
         self.model: FlowPolicy = hydra.utils.instantiate(cfg.policy)
-        # #region agent log
-        _dbg_breadcrumb("workspace.__init__:after-instantiate-policy", hypothesis_id="H5")
-        # #endregion
 
         self.ema_model: FlowPolicy = None
         if cfg.training.use_ema:
@@ -225,9 +184,6 @@ class TrainFlowPolicyWorkspace:
         # configure training state
         self.global_step = 0
         self.epoch = 0
-        # #region agent log
-        _dbg_breadcrumb("workspace.__init__:exit", hypothesis_id="H5")
-        # #endregion
 
 
 
@@ -295,17 +251,11 @@ class TrainFlowPolicyWorkspace:
                 cfg.ema,
                 model=self.ema_model)
 
-        # #region agent log
-        _dbg_breadcrumb("run:before-instantiate-env_runner", hypothesis_id="H6")
-        # #endregion
         # configure env
         env_runner: BaseRunner
         env_runner = hydra.utils.instantiate(
             cfg.task.env_runner,
             output_dir=self.output_dir)
-        # #region agent log
-        _dbg_breadcrumb("run:after-instantiate-env_runner", hypothesis_id="H6")
-        # #endregion
 
         if env_runner is not None:
             assert isinstance(env_runner, BaseRunner)
@@ -365,16 +315,17 @@ class TrainFlowPolicyWorkspace:
             {
                 "output_dir": self.output_dir,
             },
-            allow_val_change=True
+            allow_val_change=True,
         )
         # #region agent log
         _debug_log_wandb(
-            run_id="pre-fix",
+            run_id="post-fix",
             hypothesis_id="H1_H2_H4",
             location="train.py:after-config-update",
             message="wandb.config.update completed without exception",
             data={
                 "wandb_cfg_output_dir_post_update": str(wandb.config.get("output_dir", None)),
+                "allow_val_change": True,
             }
         )
         # #endregion
@@ -385,18 +336,12 @@ class TrainFlowPolicyWorkspace:
             **cfg.checkpoint.topk
         )
 
-        # #region agent log
-        _dbg_breadcrumb("run:before-model.to(device)", hypothesis_id="H8")
-        # #endregion
         # device transfer
         device = torch.device(cfg.training.device)
         self.model.to(device)
         if self.ema_model is not None:
             self.ema_model.to(device)
         optimizer_to(self.optimizer, device)
-        # #region agent log
-        _dbg_breadcrumb("run:after-model.to(device)", hypothesis_id="H8")
-        # #endregion
 
         # save batch for sampling
         train_sampling_batch = None
@@ -479,15 +424,9 @@ class TrainFlowPolicyWorkspace:
 
             # run rollout
             if (self.epoch % cfg.training.rollout_every) == 0 and RUN_ROLLOUT and env_runner is not None:
-                # #region agent log
-                _dbg_breadcrumb("run:before-env_runner.run", hypothesis_id="H7", extra={"epoch": self.epoch})
-                # #endregion
                 t3 = time.time()
                 # runner_log = env_runner.run(policy, dataset=dataset)
                 runner_log = env_runner.run(policy)
-                # #region agent log
-                _dbg_breadcrumb("run:after-env_runner.run", hypothesis_id="H7", extra={"epoch": self.epoch})
-                # #endregion
                 t4 = time.time()
                 # print(f"rollout time: {t4-t3:.3f}")
                 # log all
