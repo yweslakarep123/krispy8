@@ -5,8 +5,41 @@ import time
 from pathlib import Path
 from typing import List, Optional, Sequence
 
+# #region agent log
+def _kr_dbg(tag, hypothesis_id="CXA_ABORT", extra=None):
+    import json, sys
+    msg = f"[DBG-ba3d25] kitchen_runner:{tag}"
+    try:
+        sys.stdout.write(msg + "\n"); sys.stdout.flush()
+    except Exception:
+        pass
+    try:
+        payload = {
+            "sessionId": "ba3d25",
+            "runId": "post-wandb-fix",
+            "hypothesisId": hypothesis_id,
+            "location": f"kitchen_runner.py:{tag}",
+            "message": msg,
+            "data": extra or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(os.path.join(os.getcwd(), "debug-ba3d25.log"), "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+
+_kr_dbg("module:before-import-gym", hypothesis_id="H6")
+# #endregion
+
 import gymnasium as gym
+# #region agent log
+_kr_dbg("module:after-import-gym", hypothesis_id="H6")
+_kr_dbg("module:before-import-gymnasium_robotics", hypothesis_id="H6")
+# #endregion
 import gymnasium_robotics  # noqa: F401 - registers envs
+# #region agent log
+_kr_dbg("module:after-import-gymnasium_robotics", hypothesis_id="H6")
+# #endregion
 import numpy as np
 import torch
 import tqdm
@@ -20,7 +53,13 @@ from flow_policy_3d.gym_util.multistep_wrapper import MultiStepWrapper
 from flow_policy_3d.policy.base_policy import BasePolicy
 
 
+# #region agent log
+_kr_dbg("module:before-register_envs", hypothesis_id="H6")
+# #endregion
 gym.register_envs(gymnasium_robotics)
+# #region agent log
+_kr_dbg("module:after-register_envs", hypothesis_id="H6")
+# #endregion
 
 
 def _sorted_goal_keys(goal_dict) -> List[str]:
@@ -140,10 +179,21 @@ class KitchenRunner(BaseRunner):
 
     def _render_frame(self, env) -> np.ndarray:
         """Render the underlying env as (H, W, C) uint8 frame."""
+        # #region agent log
+        if not getattr(self, "_dbg_render_logged", False):
+            _kr_dbg("_render_frame:before-first-render", hypothesis_id="H7")
+            self._dbg_render_logged = True
+        # #endregion
         try:
             frame = env.unwrapped.render()
         except Exception:
             frame = None
+        # #region agent log
+        if getattr(self, "_dbg_render_logged", False) and not getattr(self, "_dbg_render_after_logged", False):
+            _kr_dbg("_render_frame:after-first-render", hypothesis_id="H7",
+                    extra={"frame_is_none": frame is None})
+            self._dbg_render_after_logged = True
+        # #endregion
         if frame is None:
             return None
         return np.asarray(frame, dtype=np.uint8)
@@ -152,7 +202,13 @@ class KitchenRunner(BaseRunner):
         device = policy.device
         dtype = policy.dtype
 
+        # #region agent log
+        _kr_dbg("run:before-env_fn", hypothesis_id="H7")
+        # #endregion
         env = self.env_fn()
+        # #region agent log
+        _kr_dbg("run:after-env_fn", hypothesis_id="H7")
+        # #endregion
         goal_keys_cache = None
 
         all_success_fraction = []
@@ -167,7 +223,13 @@ class KitchenRunner(BaseRunner):
                 leave=False,
                 mininterval=self.tqdm_interval_sec):
 
+            # #region agent log
+            _kr_dbg("run:before-env.reset", hypothesis_id="H7", extra={"episode_idx": episode_idx})
+            # #endregion
             obs, info = env.reset()
+            # #region agent log
+            _kr_dbg("run:after-env.reset", hypothesis_id="H7", extra={"episode_idx": episode_idx})
+            # #endregion
             policy.reset()
 
             if goal_keys_cache is None:
