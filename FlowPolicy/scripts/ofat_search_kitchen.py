@@ -258,8 +258,38 @@ _PROGRESS_FILE: pathlib.Path = None  # set di main(), dipakai oleh helper di baw
 
 
 def _pr(msg: str = "") -> None:
-    """Print ke stdout (flush) + append ke progress.log."""
-    print(msg, flush=True)
+    """Print ke stdout (flush) + append ke progress.log.
+
+    `BrokenPipeError` ditangkap diam-diam supaya aman ketika output
+    di-pipe ke `head`, `tail`, dll. di Colab (`set -o pipefail`).
+    """
+    # #region agent log
+    try:
+        import json as _json, time as _time
+        with open("/home/daffa/Documents/skpsi/.cursor/debug-8dee3e.log",
+                  "a", encoding="utf-8") as _f:
+            _f.write(_json.dumps({
+                "sessionId": "8dee3e",
+                "runId": "post-fix-sigpipe",
+                "hypothesisId": "H1_broken_pipe",
+                "location": "ofat_search_kitchen.py:_pr",
+                "message": "print attempt",
+                "timestamp": int(_time.time() * 1000),
+                "data": {"len": len(msg)},
+            }) + "\n")
+    except Exception:
+        pass
+    # #endregion
+    try:
+        print(msg, flush=True)
+    except BrokenPipeError:
+        # Stdout ditutup downstream (mis. head). Biarkan sisa eksekusi
+        # menulis ke progress.log saja tanpa crash.
+        try:
+            import sys as _sys
+            _sys.stdout = open(os.devnull, "w")
+        except Exception:
+            pass
     if _PROGRESS_FILE is not None:
         try:
             with open(_PROGRESS_FILE, "a", encoding="utf-8") as f:
@@ -295,6 +325,15 @@ def _progress_line(done: int, total: int, cfg_idx: int, seed: int,
 
 
 def main() -> int:
+    # Standard unix behaviour for broken pipes (e.g. `| head`). Python
+    # defaults to raising BrokenPipeError; we ingin diam seperti `cat`.
+    try:
+        import signal as _signal
+        if hasattr(_signal, "SIGPIPE"):
+            _signal.signal(_signal.SIGPIPE, _signal.SIG_DFL)
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="OFAT sweep FlowPolicy kitchen")
     parser.add_argument("--seeds", type=int, nargs="+", default=DEFAULT_SEEDS)
     parser.add_argument("--episodes", type=int, default=DEFAULT_EVAL_EPISODES)

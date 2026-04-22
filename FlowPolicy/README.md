@@ -164,6 +164,16 @@ drive.mount('/content/drive', force_remount=True)
 !ln -s /content/drive/MyDrive/flowpolicy_kitchen_outputs /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
 ```
 
+**Cell 4a - (opsional) cek 32 konfigurasi x 3 seed = 96 run via dry-run.**
+Jangan gunakan `| head`; daftarnya pendek, tampilkan langsung. `| head`
+akan memicu SIGPIPE dan `set -o pipefail` menganggapnya gagal.
+
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy
+bash scripts/ofat_search_kitchen.sh 0 --dry-run
+```
+
 **Cell 4 - jalankan OFAT sweep DI BACKGROUND supaya bisa dipantau dari cell
 lain (Colab `%%bash` membuffer output saat running).** `--max-minutes 660`
 memberi budget 11 jam (sisakan buffer untuk timeout 12h Colab Free).
