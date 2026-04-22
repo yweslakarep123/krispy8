@@ -314,7 +314,8 @@ class TrainFlowPolicyWorkspace:
         wandb.config.update(
             {
                 "output_dir": self.output_dir,
-            }
+            },
+            allow_val_change=True
         )
         # #region agent log
         _debug_log_wandb(
