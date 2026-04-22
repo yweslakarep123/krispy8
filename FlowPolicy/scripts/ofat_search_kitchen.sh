@@ -14,8 +14,18 @@ shift || true
 
 cd "$(dirname "$0")/.."
 export HYDRA_FULL_ERROR=1
+# Force real-time stdout/stderr di Colab (%%bash buffering).
+export PYTHONUNBUFFERED=1
+export PYTHONFAULTHANDLER=1
 
-python scripts/ofat_search_kitchen.py \
+# stdbuf -oL -eL memaksa line-buffered di python; aman di-skip kalau stdbuf
+# tidak ada (jarang terjadi di Colab).
+PY="python -u"
+if command -v stdbuf >/dev/null 2>&1; then
+    PY="stdbuf -oL -eL python -u"
+fi
+
+${PY} scripts/ofat_search_kitchen.py \
     --episodes 50 \
     --seeds 0 42 101 \
     --out-root data/outputs/ofat_search \

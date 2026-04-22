@@ -252,6 +252,48 @@ def _append_run_row(results_csv: pathlib.Path, cfg_idx: int, seed: int,
     append_result_row(results_csv, row)
 
 
+# ----- progress reporting (Colab-friendly) -----------------------------------
+
+_PROGRESS_FILE: pathlib.Path = None  # set di main(), dipakai oleh helper di bawah
+
+
+def _pr(msg: str = "") -> None:
+    """Print ke stdout (flush) + append ke progress.log."""
+    print(msg, flush=True)
+    if _PROGRESS_FILE is not None:
+        try:
+            with open(_PROGRESS_FILE, "a", encoding="utf-8") as f:
+                f.write(msg + "\n")
+        except Exception:
+            pass
+
+
+def _fmt_hms(seconds: float) -> str:
+    seconds = int(max(0, seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def _progress_line(done: int, total: int, cfg_idx: int, seed: int,
+                   hp_key: str, hp_value: Any, status: str,
+                   sr: Any, t_train: float, t_infer: float,
+                   elapsed_sweep: float) -> str:
+    if isinstance(sr, (int, float)):
+        sr_str = f"SR={sr:.4f}"
+    else:
+        sr_str = "SR=   n/a "
+    eta_str = ""
+    if done > 0 and total > 0:
+        avg = elapsed_sweep / done
+        eta = avg * (total - done)
+        eta_str = f" eta={_fmt_hms(eta)}"
+    return (f"[PROGRESS {done:3d}/{total}] cfg_{cfg_idx:02d} seed={seed:<3d} "
+            f"[{hp_key}={hp_value}] {sr_str} status={status} "
+            f"t_train={t_train:5.0f}s t_infer={t_infer:4.0f}s "
+            f"elapsed={_fmt_hms(elapsed_sweep)}{eta_str}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="OFAT sweep FlowPolicy kitchen")
     parser.add_argument("--seeds", type=int, nargs="+", default=DEFAULT_SEEDS)
@@ -282,8 +324,22 @@ def main() -> int:
     results_csv = out_root / "results.csv"
     summary_csv = out_root / "summary.csv"
     configs_json = out_root / "configs.json"
+    progress_log = out_root / "progress.log"
+
+    # Aktifkan penulisan progress ke file supaya bisa di-tail dari Colab cell
+    # lain walaupun stdout %%bash di-buffer.
+    global _PROGRESS_FILE
+    _PROGRESS_FILE = progress_log
 
     enum_cfgs = enumerate_configs()
+
+    # hitung total run setelah filter (--only-hp / --only-cfg)
+    filtered_cfgs = [
+        (gidx, k, v, cfg) for (gidx, k, v, cfg) in enum_cfgs
+        if (not args.only_cfg or gidx in args.only_cfg)
+        and (not args.only_hp or k == args.only_hp)
+    ]
+    total_planned = len(filtered_cfgs) * len(args.seeds)
 
     # dump konfigurasi yang akan dijalankan
     cfg_dump = [
@@ -292,40 +348,45 @@ def main() -> int:
     ]
     with open(configs_json, "w", encoding="utf-8") as f:
         json.dump(cfg_dump, f, indent=2, default=str)
-    print(f"[ofat] {len(enum_cfgs)} konfigurasi unik x {len(args.seeds)} seed "
-          f"= {len(enum_cfgs)*len(args.seeds)} run total")
-    print(f"[ofat] konfigurasi ditulis ke {configs_json}")
-    print(f"[ofat] baseline: {BASELINE}")
+    _pr(f"[ofat] {len(enum_cfgs)} konfigurasi unik x {len(args.seeds)} seed "
+        f"= {len(enum_cfgs)*len(args.seeds)} run total "
+        f"(akan dijalankan/di-resume: {total_planned})")
+    _pr(f"[ofat] konfigurasi ditulis ke {configs_json}")
+    _pr(f"[ofat] progress log    : {progress_log}")
+    _pr(f"[ofat] results.csv     : {results_csv}")
+    _pr(f"[ofat] baseline: {BASELINE}")
 
     if args.dry_run:
-        print("[dry-run] list konfigurasi:")
+        _pr("[dry-run] list konfigurasi:")
         for (gidx, k, v, cfg) in enum_cfgs:
             if args.only_cfg and gidx not in args.only_cfg:
                 continue
             if args.only_hp and k != args.only_hp:
                 continue
-            print(f"  cfg {gidx:02d}: sweep[{k}={v}] -> {cfg}")
+            _pr(f"  cfg {gidx:02d}: sweep[{k}={v}] -> {cfg}")
         return 0
 
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = args.gpu
     env["HYDRA_FULL_ERROR"] = "1"
+    # Paksa child python unbuffered supaya log di-stream ke stdout secara
+    # real-time walau output diteruskan ke file.
+    env["PYTHONUNBUFFERED"] = "1"
 
     t_sweep_start = time.time()
-    total_runs = 0
-    for (gidx, hp_key, hp_value, cfg) in enum_cfgs:
-        if args.only_cfg and gidx not in args.only_cfg:
-            continue
-        if args.only_hp and hp_key != args.only_hp:
-            continue
+    done = 0
+    for (gidx, hp_key, hp_value, cfg) in filtered_cfgs:
         for seed in args.seeds:
-            total_runs += 1
+            done += 1
+            elapsed = time.time() - t_sweep_start
+
             # time-budget check
             if args.max_minutes is not None:
-                elapsed_min = (time.time() - t_sweep_start) / 60.0
+                elapsed_min = elapsed / 60.0
                 if elapsed_min >= args.max_minutes:
-                    print(f"\n[ofat] --max-minutes={args.max_minutes} tercapai "
-                          f"({elapsed_min:.1f} min), stop.")
+                    _pr(f"\n[ofat] --max-minutes={args.max_minutes} tercapai "
+                        f"({elapsed_min:.1f} min), stop di {done-1}/"
+                        f"{total_planned}.")
                     if not args.skip_summary:
                         write_summary(results_csv, summary_csv, enum_cfgs)
                     return 0
@@ -335,47 +396,59 @@ def main() -> int:
             infer_subdir = f"inference_ep{args.episodes}"
             mpath = metrics_path_for(run_dir, infer_subdir)
 
-            print(f"\n========== [cfg {gidx:02d} / seed {seed}] "
-                  f"({total_runs}) sweep[{hp_key}={hp_value}] ==========")
-            print(f"  cfg      : {cfg}")
-            print(f"  run_dir  : {run_dir}")
+            _pr(f"\n========== [cfg {gidx:02d} / seed {seed}] "
+                f"({done}/{total_planned}) sweep[{hp_key}={hp_value}] "
+                f"==========")
+            _pr(f"  cfg      : {cfg}")
+            _pr(f"  run_dir  : {run_dir}")
 
+            # Resume: metrics sudah ada -> skip
             if mpath.is_file():
                 try:
                     metrics = read_metrics(mpath)
                     if "test_mean_score" in metrics:
-                        print(f"  [skip] metrics sudah ada: "
-                              f"SR={metrics['test_mean_score']:.4f}")
+                        sr = metrics["test_mean_score"]
+                        _pr(f"  [skip] metrics sudah ada: SR={sr:.4f}")
                         _append_run_row(results_csv, gidx, seed, hp_key,
                                         hp_value, cfg, metrics,
                                         status="skip_resume")
+                        _pr(_progress_line(
+                            done, total_planned, gidx, seed, hp_key, hp_value,
+                            "skip_resume", sr, 0.0, 0.0,
+                            time.time() - t_sweep_start))
                         continue
                 except Exception:
                     pass
 
-            # training
+            # ---- training ----
             t0 = time.time()
             ckpt_path = run_dir / "checkpoints" / "latest.ckpt"
             if ckpt_path.is_file():
-                print(f"  [skip-train] ckpt sudah ada: {ckpt_path}")
+                _pr(f"  [skip-train] ckpt sudah ada: {ckpt_path}")
             else:
                 train_cmd = build_train_cmd(cfg, seed, run_dir, save_ckpt=True)
-                print(f"  [train] {' '.join(train_cmd)}")
+                _pr(f"  [train] {' '.join(train_cmd)}")
                 rc = run_subprocess(
                     train_cmd, run_dir / "train_stdout.log", env=env)
                 if rc != 0 or not ckpt_path.is_file():
-                    print(f"  [ERROR] training gagal (rc={rc}), skip inferensi.")
+                    t_train = time.time() - t0
+                    _pr(f"  [ERROR] training gagal (rc={rc}), skip inferensi.")
                     _append_run_row(results_csv, gidx, seed, hp_key, hp_value,
-                                    cfg, {}, status=f"train_failed_rc{rc}",
-                                    t_train=time.time() - t0)
+                                    cfg, {},
+                                    status=f"train_failed_rc{rc}",
+                                    t_train=t_train)
+                    _pr(_progress_line(
+                        done, total_planned, gidx, seed, hp_key, hp_value,
+                        f"train_failed_rc{rc}", None, t_train, 0.0,
+                        time.time() - t_sweep_start))
                     continue
             t_train = time.time() - t0
 
-            # inference
+            # ---- inference ----
             t1 = time.time()
             infer_cmd = build_infer_cmd(
                 ckpt_path, episodes=args.episodes, output_subdir=infer_subdir)
-            print(f"  [infer] {' '.join(infer_cmd)}")
+            _pr(f"  [infer] {' '.join(infer_cmd)}")
             rc = run_subprocess(
                 infer_cmd, run_dir / "infer_stdout.log", env=env)
             t_infer = time.time() - t1
@@ -385,18 +458,23 @@ def main() -> int:
                 try:
                     metrics = read_metrics(mpath)
                 except Exception as exc:
-                    print(f"  [WARN] gagal parse metrics: {exc}")
+                    _pr(f"  [WARN] gagal parse metrics: {exc}")
             else:
-                print(f"  [ERROR] inferensi gagal (rc={rc})")
+                _pr(f"  [ERROR] inferensi gagal (rc={rc})")
 
+            status = "ok" if metrics else f"infer_failed_rc{rc}"
             _append_run_row(results_csv, gidx, seed, hp_key, hp_value, cfg,
-                            metrics,
-                            status="ok" if metrics else f"infer_failed_rc{rc}",
+                            metrics, status=status,
                             t_train=t_train, t_infer=t_infer)
+            _pr(_progress_line(
+                done, total_planned, gidx, seed, hp_key, hp_value, status,
+                metrics.get("test_mean_score") if metrics else None,
+                t_train, t_infer, time.time() - t_sweep_start))
 
     if not args.skip_summary:
         write_summary(results_csv, summary_csv, enum_cfgs)
-    print("[done] Selesai.")
+    _pr(f"[done] Selesai. Total elapsed: "
+        f"{_fmt_hms(time.time() - t_sweep_start)}")
     return 0
 
 

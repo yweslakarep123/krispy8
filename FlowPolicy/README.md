@@ -164,21 +164,63 @@ drive.mount('/content/drive', force_remount=True)
 !ln -s /content/drive/MyDrive/flowpolicy_kitchen_outputs /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
 ```
 
-**Cell 4 - jalankan OFAT sweep dengan budget waktu (Colab free timeout 12h,
-sisakan buffer untuk summary):**
+**Cell 4 - jalankan OFAT sweep DI BACKGROUND supaya bisa dipantau dari cell
+lain (Colab `%%bash` membuffer output saat running).** `--max-minutes 660`
+memberi budget 11 jam (sisakan buffer untuk timeout 12h Colab Free).
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
 export MUJOCO_GL=egl
-bash scripts/ofat_search_kitchen.sh 0 --max-minutes 660
+# kill sisa proses kalau ada, lalu jalankan di background
+pkill -f ofat_search_kitchen.py 2>/dev/null || true
+nohup bash scripts/ofat_search_kitchen.sh 0 --max-minutes 660 \
+    > /tmp/ofat_master.log 2>&1 &
+sleep 2
+echo "Sweep PID: $(pgrep -f ofat_search_kitchen.py || echo '(tidak jalan)')"
+echo "Master log: /tmp/ofat_master.log"
+echo "Progress log : data/outputs/ofat_search/progress.log"
 ```
 
-Bila runtime Colab restart sebelum 96 run selesai, cell 4 bisa dijalankan
-ulang — skrip otomatis skip `(cfg, seed)` yang sudah punya `metrics.json`
-valid (berkat symlink ke Drive, progres tidak hilang).
+**Cell 5 - pantau progress satu baris per run (paling ringkas):**
 
-**Cell 5 - inspect hasil:**
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy
+# Tampilkan hanya baris [PROGRESS n/96] dari progress.log, live
+grep -n "^\[PROGRESS" data/outputs/ofat_search/progress.log 2>/dev/null | tail -n 30
+echo "---"
+echo "Jumlah selesai: $(grep -c '^\[PROGRESS' data/outputs/ofat_search/progress.log 2>/dev/null || echo 0) / 96"
+echo "Sweep masih jalan? $(pgrep -f ofat_search_kitchen.py >/dev/null && echo YES || echo NO)"
+```
+
+Jalankan cell 5 berulang kali (Ctrl+Enter) untuk refresh. Contoh output:
+```
+[PROGRESS   1/96] cfg_00 seed=0   [training.num_epochs=500] SR=0.2150 status=ok t_train=  420s t_infer=  55s elapsed=00:07:55 eta=12:25:00
+[PROGRESS   2/96] cfg_00 seed=42  [training.num_epochs=500] SR=0.1875 status=ok ...
+```
+
+**Cell 6 - live tail master log (output penuh dari semua training/inferensi):**
+
+```bash
+%%bash
+tail -n 60 /tmp/ofat_master.log
+```
+
+**Cell 7 - lihat log run aktif paling baru (train/infer):**
+
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
+latest=$(ls -td cfg_* 2>/dev/null | head -n 1)
+echo "Run aktif terbaru: $latest"
+echo "===== train_stdout.log (tail) ====="
+tail -n 40 "$latest/train_stdout.log" 2>/dev/null || echo "(belum ada)"
+echo "===== infer_stdout.log (tail) ====="
+tail -n 40 "$latest/infer_stdout.log" 2>/dev/null || echo "(belum ada)"
+```
+
+**Cell 8 - setelah selesai: cek summary top-10:**
 
 ```bash
 %%bash
@@ -188,7 +230,17 @@ echo "----- summary.csv (top 10) -----"
 head -n 11 data/outputs/ofat_search/summary.csv
 ```
 
-**Cell 6 (opsional) - inferensi 50 episode manual dari 1 checkpoint:**
+**Cell 9 (opsional) - hentikan sweep di tengah jalan:**
+
+```bash
+%%bash
+pkill -f ofat_search_kitchen.py && echo "dihentikan" || echo "tidak ada proses"
+```
+
+Bila runtime Colab restart sebelum 96 run selesai, jalankan ulang cell 4
+— skrip otomatis skip `(cfg, seed)` yang sudah punya `metrics.json` valid.
+
+**Cell 10 (opsional) - inferensi 50 episode manual dari 1 checkpoint:**
 
 ```bash
 %%bash
