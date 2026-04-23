@@ -1,0 +1,36 @@
+Traceback (most recent call last):                                              
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 732, in <module>
+    main()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 729, in main
+    workspace.run()
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 422, in run
+    loss.backward()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+    torch.autograd.backward(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+    _engine_run_backward(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

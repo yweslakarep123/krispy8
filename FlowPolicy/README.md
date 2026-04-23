@@ -18,8 +18,9 @@ agent_pos_t = concat(obs_dict['observation'],
                      flatten(obs_dict['desired_goal']))
 ```
 
-with the `desired_goal` dict flattened in **alphabetical key order** so the
-same layout is used during training (Minari) and rollout (`gymnasium`).
+with the `desired_goal` dict flattened mengikuti urutan `tasks_to_complete`
+(default: `microwave -> kettle -> light switch -> slide cabinet`) agar layout
+state konsisten antara training (Minari) dan rollout (`gymnasium`).
 
 For `tasks_to_complete = [microwave, kettle, light switch, slide cabinet]`:
 
@@ -88,7 +89,77 @@ diterapkan pada split training):
 | `dataset.action_noise_std`   | `0.0`   | Gaussian noise pada target action            |
 | `dataset.normalizer_mode`    | `limits`| `limits` atau `gaussian`                     |
 
-Override via Hydra, mis. `dataset.obs_noise_std=0.02`.
+Override via Hydra, mis. `task.dataset.obs_noise_std=0.02`.
+
+## Preprocessing sliding-window (opsional)
+
+Secara default pipeline lama yang dipakai: setiap demonstrasi Minari jadi
+satu trajectory, `SequenceSampler` menarik potongan panjang `horizon`
+dengan stride 1, dan split hanya `val_ratio` episode untuk validasi
+(tidak ada test split).
+
+Bila `task.dataset.preprocess.enabled=true`, alur pra-pelatihan berubah jadi:
+
+1. **Sliding window per demonstrasi.** Untuk setiap episode panjang `T`,
+   dipotong jadi window berukuran `round(window_ratio * T)` dengan stride
+   `stride` (default 1 -> setiap timestep jadi awal window baru). Setiap
+   window jadi "episode" independen di `ReplayBuffer`.
+2. **Split 70/20/10.** Semua window di-shuffle (`split_seed`) lalu dibagi
+   menjadi `train_ratio` / `val_ratio` / `test_ratio` (default
+   `0.70 / 0.20 / 0.10`).
+3. **Augmentasi noise hanya di train.** `obs_noise_std` dan
+   `action_noise_std` diterapkan sesudah split, dan hanya untuk sample
+   milik training split (validasi/test tetap bersih).
+
+Konfigurasi di `FlowPolicy/flow_policy_3d/config/task/kitchen_complete.yaml`:
+
+```yaml
+dataset:
+  preprocess:
+    enabled: false            # true = aktifkan sliding window + 70/20/10
+    window_ratio: 0.25        # ukuran window = 25% panjang episode
+    stride: 1
+    train_ratio: 0.70
+    val_ratio: 0.20
+    test_ratio: 0.10
+    split_seed: 42
+```
+
+Override cepat via Hydra. Blok `dataset` tinggal di dalam `task`, jadi
+path override-nya `task.dataset.preprocess.*` (bukan
+`dataset.preprocess.*`):
+
+```bash
+# aktifkan preprocessing
+python FlowPolicy/train.py --config-name=flowpolicy \
+  task=kitchen_complete \
+  task.dataset.preprocess.enabled=true
+
+# matikan preprocessing (default)
+python FlowPolicy/train.py --config-name=flowpolicy \
+  task=kitchen_complete \
+  task.dataset.preprocess.enabled=false
+
+# contoh override rasio/window
+python FlowPolicy/train.py --config-name=flowpolicy \
+  task=kitchen_complete \
+  task.dataset.preprocess.enabled=true \
+  task.dataset.preprocess.window_ratio=0.25 \
+  task.dataset.preprocess.stride=1 \
+  task.dataset.preprocess.train_ratio=0.70 \
+  task.dataset.preprocess.val_ratio=0.20 \
+  task.dataset.preprocess.test_ratio=0.10
+```
+
+Catatan:
+
+- Evaluasi utama (`test_mean_score`) tetap dihitung dari rollout di
+  `FrankaKitchen-v1`, bukan dari split test window. Split test window
+  tersedia lewat `dataset.get_test_dataset()` untuk evaluasi offline
+  (loss BC murni) bila dibutuhkan.
+- Window ratio yang terlalu kecil (misal 0.05) bisa menghasilkan window
+  lebih pendek dari `horizon` dan menyebabkan padding konstan agresif di
+  `SequenceSampler`. Pastikan `round(window_ratio * T) >= horizon`.
 
 ## OFAT hyperparameter sweep (8 HP x 4 nilai x 3 seed = 96 run)
 
@@ -116,12 +187,23 @@ Menjalankan:
 ```bash
 cd FlowPolicy
 bash scripts/ofat_search_kitchen.sh 0 --dry-run          # cek 32 konfigurasi
-bash scripts/ofat_search_kitchen.sh 0                    # full sweep di GPU 0
+bash scripts/ofat_search_kitchen.sh 0                    # full sweep di GPU 0 (tanpa preprocessing)
+bash scripts/ofat_search_kitchen.sh 0 --preprocess       # full sweep di GPU 0 (semua run pakai preprocessing)
 bash scripts/ofat_search_kitchen.sh 0 --only-hp optimizer.lr   # hanya sweep lr
 bash scripts/ofat_search_kitchen.sh 0 --max-minutes 600   # stop setelah 10 jam (Colab T4)
 ```
 
-Keluaran di `data/outputs/ofat_search/`:
+Jika `--preprocess` aktif, OFAT meneruskan override
+`task.dataset.preprocess.*` ke **setiap** perintah training (`cfg_idx x seed`),
+jadi semua run yang dieksekusi memakai preprocessing (bukan hanya run tertentu).
+
+Keluaran:
+
+- mode default (tanpa `--preprocess`) -> `data/outputs/ofat_search/`
+- mode preprocessing (`--preprocess`) -> `data/outputs/ofat_search_preprocess/`
+  (auto-suffix agar hasil dua mode tidak saling menimpa saat resume)
+
+Isi folder output:
 
 - `configs.json` — 32 konfigurasi unik
 - `cfg_<ii>_seed<s>/` — run_dir per (konfigurasi, seed)
@@ -174,6 +256,14 @@ cd /content/flowpolicy_kitchen/FlowPolicy
 bash scripts/ofat_search_kitchen.sh 0 --dry-run
 ```
 
+Untuk dry-run dengan preprocessing:
+
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy
+bash scripts/ofat_search_kitchen.sh 0 --preprocess --dry-run
+```
+
 **Cell 4 - jalankan OFAT sweep DI BACKGROUND supaya bisa dipantau dari cell
 lain (Colab `%%bash` membuffer output saat running).** `--max-minutes 660`
 memberi budget 11 jam (sisakan buffer untuk timeout 12h Colab Free).
@@ -192,12 +282,28 @@ echo "Master log: /tmp/ofat_master.log"
 echo "Progress log : data/outputs/ofat_search/progress.log"
 ```
 
+Jika ingin mode preprocessing di Colab:
+
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy
+export MUJOCO_GL=egl
+pkill -f ofat_search_kitchen.py 2>/dev/null || true
+nohup bash scripts/ofat_search_kitchen.sh 0 --preprocess --max-minutes 660 \
+    > /tmp/ofat_master.log 2>&1 &
+sleep 2
+echo "Sweep PID: $(pgrep -f ofat_search_kitchen.py || echo '(tidak jalan)')"
+echo "Master log: /tmp/ofat_master.log"
+echo "Progress log : data/outputs/ofat_search_preprocess/progress.log"
+```
+
 **Cell 5 - pantau progress satu baris per run (paling ringkas):**
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
 # Tampilkan hanya baris [PROGRESS n/96] dari progress.log, live
+# (ganti folder ke ofat_search_preprocess jika mode preprocessing aktif)
 grep -n "^\[PROGRESS" data/outputs/ofat_search/progress.log 2>/dev/null | tail -n 30
 echo "---"
 echo "Jumlah selesai: $(grep -c '^\[PROGRESS' data/outputs/ofat_search/progress.log 2>/dev/null || echo 0) / 96"

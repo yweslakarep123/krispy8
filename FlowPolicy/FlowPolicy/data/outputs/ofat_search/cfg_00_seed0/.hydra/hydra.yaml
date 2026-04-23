@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
+    dir: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
   sweep:
     dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
     subdir: ${hydra.job.num}
@@ -110,7 +110,7 @@ hydra:
   output_subdir: .hydra
   overrides:
     hydra:
-    - hydra.run.dir=/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
+    - hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
     - hydra.mode=RUN
     task:
     - task=kitchen_complete
@@ -147,18 +147,18 @@ hydra:
   runtime:
     version: 1.3.2
     version_base: '1.3'
-    cwd: /home/daffa/Documents/skpsi
+    cwd: /home/daffa/Documents/krispy8
     config_sources:
     - path: hydra.conf
       schema: pkg
       provider: hydra
-    - path: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/flow_policy_3d/config
+    - path: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/config
       schema: file
       provider: main
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
+    output_dir: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
     choices:
       task: kitchen_complete
       hydra/env: default

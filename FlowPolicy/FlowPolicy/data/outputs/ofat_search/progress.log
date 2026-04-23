@@ -27,3 +27,22 @@
   cfg 01: sweep[training.num_epochs=1000] -> {'training.num_epochs': 1000, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
   cfg 02: sweep[training.num_epochs=3000] -> {'training.num_epochs': 3000, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
   cfg 03: sweep[training.num_epochs=5000] -> {'training.num_epochs': 5000, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
+[ofat] 32 konfigurasi unik x 1 seed = 32 run total (akan dijalankan/di-resume: 1)
+[ofat] konfigurasi ditulis ke /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/configs.json
+[ofat] progress log    : /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/progress.log
+[ofat] results.csv     : /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/results.csv
+[ofat] baseline: {'training.num_epochs': 3000, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
+[ofat] preprocessing sliding-window: OFF (pipeline episode-level)
+[dry-run] list konfigurasi:
+  cfg 00: sweep[training.num_epochs=500] -> {'training.num_epochs': 500, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
+[ofat] 32 konfigurasi unik x 3 seed = 96 run total (akan dijalankan/di-resume: 96)
+[ofat] konfigurasi ditulis ke /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/configs.json
+[ofat] progress log    : /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/progress.log
+[ofat] results.csv     : /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/results.csv
+[ofat] baseline: {'training.num_epochs': 3000, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
+[ofat] preprocessing sliding-window: OFF (pipeline episode-level)
+
+========== [cfg 00 / seed 0] (1/96) sweep[training.num_epochs=500] ==========
+  cfg      : {'training.num_epochs': 500, 'optimizer.lr': 0.0001, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.01, 'policy.Conditional_ConsistencyFM.delta': 0.01, 'n_action_steps': 4, 'n_obs_steps': 4}
+  run_dir  : /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0
+  [train] /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0 training.seed=0 training.device=cuda training.debug=False exp_name=ofat_search logging.name=ofat_cfg_00_seed0 logging.mode=offline checkpoint.save_ckpt=True training.num_epochs=500 optimizer.lr=0.0001 dataloader.batch_size=128 val_dataloader.batch_size=128 policy.Conditional_ConsistencyFM.num_segments=2 policy.Conditional_ConsistencyFM.eps=0.01 policy.Conditional_ConsistencyFM.delta=0.01 n_action_steps=4 n_obs_steps=4

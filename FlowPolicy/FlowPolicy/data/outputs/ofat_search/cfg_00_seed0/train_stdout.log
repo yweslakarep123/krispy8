@@ -1,6 +1,6 @@
-# cmd: /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0 training.seed=0 training.device=cuda training.debug=False exp_name=ofat_search logging.name=ofat_cfg_00_seed0 logging.mode=offline checkpoint.save_ckpt=True training.num_epochs=500 optimizer.lr=0.0001 dataloader.batch_size=128 val_dataloader.batch_size=128 policy.Conditional_ConsistencyFM.num_segments=2 policy.Conditional_ConsistencyFM.eps=0.01 policy.Conditional_ConsistencyFM.delta=0.01 n_action_steps=4 n_obs_steps=4
+# cmd: /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0 training.seed=0 training.device=cuda training.debug=False exp_name=ofat_search logging.name=ofat_cfg_00_seed0 logging.mode=offline checkpoint.save_ckpt=True training.num_epochs=500 optimizer.lr=0.0001 dataloader.batch_size=128 val_dataloader.batch_size=128 policy.Conditional_ConsistencyFM.num_segments=2 policy.Conditional_ConsistencyFM.eps=0.01 policy.Conditional_ConsistencyFM.delta=0.01 n_action_steps=4 n_obs_steps=4
 [LowdimEncoder] state_dim=70 out_channel=64 hidden_dims=(256, 256)
-[2026-04-21 22:52:02,313][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.719451e+07
+[2026-04-23 13:29:34,916][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 6.719451e+07
 ----------------------------------
 Class name: FlowPolicyLowdim
   Number of parameters: 67.2959M
@@ -13,22 +13,20 @@ Class name: FlowPolicyLowdim
 [KitchenDataset] loaded 19 episodes, 4209 total steps
 [KitchenDataset] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
 [KitchenDataset] order filter: tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'], skipped=0 episode(s) not matching order
+[KitchenDataset] preprocessing disabled: episodes train/val/test=18/1/0
 [KitchenDataset] agent_pos_dim=70 action_dim=9 robot_obs_dim(for noise)=59
-[2026-04-21 22:52:03,507][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
-wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id hia0c9hs.
-wandb: Tracking run with wandb version 0.26.0
-wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
-wandb: Run data is saved locally in /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260421_225203-hia0c9hs
+[2026-04-23 13:29:35,798][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
 -----------------------------
 [WandB] group: ofat_search
 [WandB] name: ofat_cfg_00_seed0
 -----------------------------
-Training epoch 0:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 0:  12%|█▎        | 4/32 [00:01<00:07,  3.94it/s, loss=0.000175]Training epoch 0:  44%|████▍     | 14/32 [00:02<00:02,  7.37it/s, loss=0.000166]Training epoch 0:  75%|███████▌  | 24/32 [00:03<00:00,  8.49it/s, loss=0.00015]                                                                                Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s]Eval FrankaKitchen-v1 [kitchen_complete]:  20%|██        | 4/20 [00:05<00:21,  1.34s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  45%|████▌     | 9/20 [00:11<00:13,  1.25s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  70%|███████   | 14/20 [00:17<00:07,  1.22s/it]Eval FrankaKitchen-v1 [kitchen_complete]:  95%|█████████▌| 19/20 [00:23<00:01,  1.23s/it]                                                                                         wandb: Encoding video...
-[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
-test_mean_score (kitchen success frac): 0.0875
-mean completed tasks per ep: 0.35 / 4
-Training epoch 1:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 1:  28%|██▊       | 9/32 [00:01<00:02,  8.96it/s, loss=0.000123]Training epoch 1:  59%|█████▉    | 19/32 [00:02<00:01,  9.35it/s, loss=0.000117]Training epoch 1:  91%|█████████ | 29/32 [00:03<00:00,  9.48it/s, loss=0.000118]                                                                                Training epoch 2:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 2:  31%|███▏      | 10/32 [00:01<00:02,  9.15it/s, loss=0.000114]Training epoch 2:  62%|██████▎   | 20/32 [00:02<00:01,  9.47it/s, loss=0.000114]Training epoch 2:  94%|█████████▍| 30/32 [00:03<00:00,  9.58it/s, loss=0.000112]                                                                                Training epoch 3:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 3:  28%|██▊       | 9/32 [00:01<00:02,  8.93it/s, loss=0.000117]Training epoch 3:  59%|█████▉    | 19/32 [00:02<00:01,  9.38it/s, loss=0.000117]Training epoch 3:  91%|█████████ | 29/32 [00:03<00:00,  9.54it/s, loss=0.000114]                                                                                Training epoch 4:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 4:  31%|███▏      | 10/32 [00:01<00:02,  9.20it/s, loss=0.000113]Training epoch 4:  62%|██████▎   | 20/32 [00:02<00:01,  9.48it/s, loss=0.000113]Training epoch 4:  94%|█████████▍| 30/32 [00:03<00:00,  9.57it/s, loss=0.000117]                                                                                Training epoch 5:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 5:  31%|███▏      | 10/32 [00:01<00:02,  9.16it/s, loss=0.000113]Training epoch 5:  62%|██████▎   | 20/32 [00:02<00:01,  9.43it/s, loss=0.000112]                                                                                Traceback (most recent call last):
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 607, in <module>
+wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id hia0c9hs.
+wandb: Tracking run with wandb version 0.26.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260423_132935-hia0c9hs
+Training epoch 0:   0%|          | 0/32 [00:00<?, ?it/s]Training epoch 0:  22%|██▏       | 7/32 [00:01<00:03,  6.42it/s, loss=0.000173]Training epoch 0:  53%|█████▎    | 17/32 [00:02<00:01,  8.40it/s, loss=0.000165]Training epoch 0:  84%|████████▍ | 27/32 [00:03<00:00,  9.09it/s, loss=0.000143]                                                                                Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s][KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+Eval FrankaKitchen-v1 [kitchen_complete]:  20%|██        | 4/20 [00:05<00:21,  1.36s/it]                                                                                        Traceback (most recent call last):
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 699, in <module>
     main()
   File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
     _run_hydra(
@@ -48,13 +46,46 @@ mean completed tasks per ep: 0.35 / 4
   File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
     ret.return_value = task_function(task_cfg)
                        ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 604, in main
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 696, in main
     workspace.run()
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 312, in run
-    raw_loss_cpu = raw_loss.item()
-                   ^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 449, in run
+    runner_log = env_runner.run(policy)
+                 ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/env_runner/kitchen_runner.py", line 215, in run
+    obs, reward, terminated, truncated, info = env.step(action)
+                                               ^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/gym_util/multistep_wrapper.py", line 167, in step
+    step_result = self.env.step(act)
+                  ^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 125, in step
+    observation, reward, terminated, truncated, info = self.env.step(action)
+                                                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 393, in step
+    return super().step(action)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium/core.py", line 327, in step
+    return self.env.step(action)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 285, in step
+    return self.env.step(action)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium_robotics/envs/franka_kitchen/kitchen_env.py", line 400, in step
+    robot_obs, _, terminated, truncated, info = self.robot_env.step(action)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium_robotics/envs/franka_kitchen/franka_env.py", line 108, in step
+    obs = self._get_obs()
+          ^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium_robotics/envs/franka_kitchen/franka_env.py", line 114, in _get_obs
+    robot_qpos, robot_qvel = robot_get_obs(
+                             ^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium_robotics/utils/mujoco_utils.py", line 28, in robot_get_obs
+    np.squeeze(np.array([get_joint_qpos(model, data, name) for name in names])),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/gymnasium_robotics/utils/mujoco_utils.py", line 198, in get_joint_qpos
+    return data.qpos[start_idx:end_idx].copy()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 KeyboardInterrupt
 [1;34mwandb[0m: 
 [1;34mwandb[0m: You can sync this run to the cloud by running:
-[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260421_225203-hia0c9hs[0m
-[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260421_225203-hia0c9hs/logs[0m
+[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260423_132935-hia0c9hs[0m
+[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/ofat_search/cfg_00_seed0/wandb/offline-run-20260423_132935-hia0c9hs/logs[0m

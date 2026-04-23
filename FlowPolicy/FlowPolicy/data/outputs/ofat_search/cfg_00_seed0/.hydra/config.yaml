@@ -43,6 +43,14 @@ task:
     obs_noise_std: 0.01
     action_noise_std: 0.0
     normalizer_mode: limits
+    preprocess:
+      enabled: false
+      window_ratio: 0.25
+      stride: 1
+      train_ratio: 0.7
+      val_ratio: 0.2
+      test_ratio: 0.1
+      split_seed: 42
 name: train_flowpolicy_lowdim
 task_name: ${task.name}
 shape_meta: ${task.shape_meta}

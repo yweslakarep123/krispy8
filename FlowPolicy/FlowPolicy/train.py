@@ -317,6 +317,26 @@ class TrainFlowPolicyWorkspace:
             },
             allow_val_change=True,
         )
+
+        # When resuming a wandb run whose server-side step is already ahead
+        # of our checkpointed `self.global_step` (e.g. the previous process
+        # logged a few more steps before being killed / OOM / Colab timeout
+        # / crashed after an intermediate save), every subsequent
+        # `wandb_run.log(..., step=self.global_step)` fires a
+        # "Tried to log to step X that is less than the current step Y"
+        # warning and silently drops the data. Align our counter to wandb's
+        # so logging resumes monotonically.
+        try:
+            wandb_step = int(getattr(wandb_run, "step", 0) or 0)
+        except Exception:
+            wandb_step = 0
+        if getattr(wandb_run, "resumed", False) and wandb_step >= self.global_step:
+            cprint(
+                f"[WandB] resumed run at server step {wandb_step}; advancing "
+                f"local global_step {self.global_step} -> {wandb_step + 1} "
+                f"to keep log steps monotonically increasing.",
+                "yellow")
+            self.global_step = wandb_step + 1
         # #region agent log
         _debug_log_wandb(
             run_id="post-fix",

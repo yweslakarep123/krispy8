@@ -26,7 +26,7 @@ import pathlib
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 SEARCH_SPACE: Dict[str, List[Any]] = {
@@ -84,7 +84,9 @@ def format_override(key: str, value: Any) -> str:
 
 
 def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
-                    save_ckpt: bool = True) -> List[str]:
+                    save_ckpt: bool = True,
+                    preprocess_overrides: Optional[Dict[str, Any]] = None,
+                    ) -> List[str]:
     overrides = [
         "--config-name=flowpolicy",
         "task=kitchen_complete",
@@ -101,6 +103,9 @@ def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
         overrides.append(format_override(k, v))
         if k == "dataloader.batch_size":
             overrides.append(format_override("val_dataloader.batch_size", v))
+    if preprocess_overrides:
+        for k, v in preprocess_overrides.items():
+            overrides.append(format_override(f"task.dataset.preprocess.{k}", v))
     return [sys.executable, "train.py", *overrides]
 
 
@@ -351,7 +356,50 @@ def main() -> int:
     parser.add_argument("--max-minutes", type=float, default=None,
                         help="Auto-stop setelah N menit (berguna untuk Colab "
                              "free T4 yang bisa kena timeout 12 jam).")
+    # --- preprocessing sliding-window (opsional) ---
+    parser.add_argument("--preprocess", action="store_true",
+                        help="Aktifkan preprocessing sliding-window "
+                             "(task.dataset.preprocess.enabled=true). Default: "
+                             "off (pakai pipeline episode-level lama).")
+    parser.add_argument("--preprocess-window-ratio", type=float, default=None,
+                        help="Override task.dataset.preprocess.window_ratio "
+                             "(butuh --preprocess). Default yaml: 0.25.")
+    parser.add_argument("--preprocess-stride", type=int, default=None,
+                        help="Override task.dataset.preprocess.stride "
+                             "(butuh --preprocess). Default yaml: 1.")
+    parser.add_argument("--preprocess-train-ratio", type=float, default=None,
+                        help="Override task.dataset.preprocess.train_ratio.")
+    parser.add_argument("--preprocess-val-ratio", type=float, default=None,
+                        help="Override task.dataset.preprocess.val_ratio.")
+    parser.add_argument("--preprocess-test-ratio", type=float, default=None,
+                        help="Override task.dataset.preprocess.test_ratio.")
+    parser.add_argument("--preprocess-split-seed", type=int, default=None,
+                        help="Override task.dataset.preprocess.split_seed.")
     args = parser.parse_args()
+
+    # Bangun dict override preprocessing sesuai flag CLI.
+    preprocess_overrides: Optional[Dict[str, Any]] = None
+    if args.preprocess:
+        preprocess_overrides = {"enabled": True}
+        if args.preprocess_window_ratio is not None:
+            preprocess_overrides["window_ratio"] = args.preprocess_window_ratio
+        if args.preprocess_stride is not None:
+            preprocess_overrides["stride"] = args.preprocess_stride
+        if args.preprocess_train_ratio is not None:
+            preprocess_overrides["train_ratio"] = args.preprocess_train_ratio
+        if args.preprocess_val_ratio is not None:
+            preprocess_overrides["val_ratio"] = args.preprocess_val_ratio
+        if args.preprocess_test_ratio is not None:
+            preprocess_overrides["test_ratio"] = args.preprocess_test_ratio
+        if args.preprocess_split_seed is not None:
+            preprocess_overrides["split_seed"] = args.preprocess_split_seed
+
+    # Hindari tabrakan run_dir/metrics antara sweep preprocess=on vs off:
+    # auto-suffix out-root saat --preprocess aktif dan user belum
+    # mengganti --out-root secara eksplisit.
+    _default_out_root = "data/outputs/ofat_search"
+    if args.preprocess and args.out_root == _default_out_root:
+        args.out_root = _default_out_root + "_preprocess"
 
     script_dir = pathlib.Path(__file__).resolve().parent
     flowpolicy_dir = script_dir.parent / "FlowPolicy"
@@ -394,6 +442,10 @@ def main() -> int:
     _pr(f"[ofat] progress log    : {progress_log}")
     _pr(f"[ofat] results.csv     : {results_csv}")
     _pr(f"[ofat] baseline: {BASELINE}")
+    if preprocess_overrides is not None:
+        _pr(f"[ofat] preprocessing sliding-window: ON -> {preprocess_overrides}")
+    else:
+        _pr(f"[ofat] preprocessing sliding-window: OFF (pipeline episode-level)")
 
     if args.dry_run:
         _pr("[dry-run] list konfigurasi:")
@@ -465,7 +517,9 @@ def main() -> int:
             if ckpt_path.is_file():
                 _pr(f"  [skip-train] ckpt sudah ada: {ckpt_path}")
             else:
-                train_cmd = build_train_cmd(cfg, seed, run_dir, save_ckpt=True)
+                train_cmd = build_train_cmd(
+                    cfg, seed, run_dir, save_ckpt=True,
+                    preprocess_overrides=preprocess_overrides)
                 _pr(f"  [train] {' '.join(train_cmd)}")
                 rc = run_subprocess(
                     train_cmd, run_dir / "train_stdout.log", env=env)
