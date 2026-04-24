@@ -268,23 +268,6 @@ def _pr(msg: str = "") -> None:
     `BrokenPipeError` ditangkap diam-diam supaya aman ketika output
     di-pipe ke `head`, `tail`, dll. di Colab (`set -o pipefail`).
     """
-    # #region agent log
-    try:
-        import json as _json, time as _time
-        with open("/home/daffa/Documents/skpsi/.cursor/debug-8dee3e.log",
-                  "a", encoding="utf-8") as _f:
-            _f.write(_json.dumps({
-                "sessionId": "8dee3e",
-                "runId": "post-fix-sigpipe",
-                "hypothesisId": "H1_broken_pipe",
-                "location": "ofat_search_kitchen.py:_pr",
-                "message": "print attempt",
-                "timestamp": int(_time.time() * 1000),
-                "data": {"len": len(msg)},
-            }) + "\n")
-    except Exception:
-        pass
-    # #endregion
     try:
         print(msg, flush=True)
     except BrokenPipeError:

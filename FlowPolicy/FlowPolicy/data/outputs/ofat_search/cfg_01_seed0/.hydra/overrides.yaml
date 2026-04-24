@@ -1,0 +1,17 @@
+- task=kitchen_complete
+- training.seed=0
+- training.device=cuda
+- training.debug=False
+- exp_name=ofat_search
+- logging.name=ofat_cfg_01_seed0
+- logging.mode=offline
+- checkpoint.save_ckpt=True
+- training.num_epochs=1000
+- optimizer.lr=0.0001
+- dataloader.batch_size=128
+- val_dataloader.batch_size=128
+- policy.Conditional_ConsistencyFM.num_segments=2
+- policy.Conditional_ConsistencyFM.eps=0.01
+- policy.Conditional_ConsistencyFM.delta=0.01
+- n_action_steps=4
+- n_obs_steps=4

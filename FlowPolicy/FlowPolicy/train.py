@@ -9,12 +9,10 @@ if __name__ == "__main__":
 
 import os
 
-# #region agent log
 # Force IPv4 for DNS resolution so Minari dataset downloads don't hang on
-# unreachable IPv6 CloudFront endpoints. No-op when the env var
-# FLOWP_FORCE_IPV4=0 is set.
-def _force_ipv4_and_log():
-    import socket, json, time
+# unreachable IPv6 CloudFront endpoints. No-op when FLOWP_FORCE_IPV4=0.
+def _force_ipv4():
+    import socket
     if os.environ.get("FLOWP_FORCE_IPV4", "1") == "0":
         return
     _orig_getaddrinfo = socket.getaddrinfo
@@ -22,88 +20,12 @@ def _force_ipv4_and_log():
     def _ipv4_getaddrinfo(host, *args, **kwargs):
         results = _orig_getaddrinfo(host, *args, **kwargs)
         ipv4 = [r for r in results if r[0] == socket.AF_INET]
-        try:
-            with open("/home/daffa/Documents/skpsi/.cursor/debug-6ac186.log",
-                      "a", encoding="utf-8") as _f:
-                _f.write(json.dumps({
-                    "sessionId": "6ac186",
-                    "runId": "dns-force-ipv4",
-                    "hypothesisId": "IPV6_HANG",
-                    "location": "train.py:getaddrinfo",
-                    "message": "resolved host",
-                    "timestamp": int(time.time() * 1000),
-                    "data": {
-                        "host": str(host),
-                        "n_all": len(results),
-                        "n_ipv4": len(ipv4),
-                        "first_ipv4": ipv4[0][4][0] if ipv4 else None,
-                    },
-                }) + "\n")
-        except Exception:
-            pass
         return ipv4 if ipv4 else results
 
     socket.getaddrinfo = _ipv4_getaddrinfo
 
 
-_force_ipv4_and_log()
-# #endregion
-
-
-# #region agent log
-def _debug_log_hydra_env():
-    import json, sys, time, os, platform
-    payload = {
-        "sessionId": "6ac186",
-        "runId": "hydra-import",
-        "hypothesisId": "H1_H2_H3",
-        "location": "train.py:pre-import-hydra",
-        "message": "pre-hydra-import environment snapshot",
-        "timestamp": int(time.time() * 1000),
-        "data": {
-            "python_version": sys.version,
-            "python_executable": sys.executable,
-            "platform": platform.platform(),
-            "sys_path_head": sys.path[:8],
-            "env_CONDA_DEFAULT_ENV": os.environ.get("CONDA_DEFAULT_ENV"),
-            "env_VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
-            "env_PYTHONPATH": os.environ.get("PYTHONPATH"),
-        },
-    }
-    try:
-        import hydra as _probe_hydra  # may raise
-        payload["data"]["hydra_version"] = getattr(_probe_hydra, "__version__", "unknown")
-        payload["data"]["hydra_file"] = getattr(_probe_hydra, "__file__", "unknown")
-        payload["data"]["hydra_import_ok"] = True
-    except Exception as exc:
-        payload["data"]["hydra_import_ok"] = False
-        payload["data"]["hydra_import_error_type"] = type(exc).__name__
-        payload["data"]["hydra_import_error_str"] = str(exc)[:400]
-        # also try to resolve where hydra would have been loaded from
-        try:
-            import importlib.util as _u
-            spec = _u.find_spec("hydra")
-            if spec is not None:
-                payload["data"]["hydra_spec_origin"] = getattr(spec, "origin", None)
-                payload["data"]["hydra_spec_search_locations"] = list(
-                    getattr(spec, "submodule_search_locations", []) or [])
-        except Exception as _inner:
-            payload["data"]["hydra_spec_probe_error"] = str(_inner)[:200]
-    try:
-        with open(
-            "/home/daffa/Documents/skpsi/.cursor/debug-6ac186.log",
-            "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-    return payload["data"].get("hydra_import_ok", False)
-
-
-_HYDRA_OK = _debug_log_hydra_env()
-if not _HYDRA_OK:
-    # Re-raise the real ImportError so the stack trace stays visible to the user
-    import hydra  # type: ignore  # noqa: F401
-# #endregion
+_force_ipv4()
 import hydra
 import torch
 import dill
@@ -132,24 +54,6 @@ warnings.filterwarnings("ignore")
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
-# #region agent log
-def _debug_log_wandb(run_id, hypothesis_id, location, message, data):
-    import json
-    payload = {
-        "sessionId": "ba3d25",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with open("debug-ba3d25.log", "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
@@ -266,51 +170,11 @@ class TrainFlowPolicyWorkspace:
         cprint(f"[WandB] name: {cfg.logging.name}", "yellow")
         cprint("-----------------------------", "yellow")
         # configure logging
-        # #region agent log
-        _debug_log_wandb(
-            run_id="pre-fix",
-            hypothesis_id="H1_H2_H4",
-            location="train.py:before-wandb-init",
-            message="snapshot before wandb.init",
-            data={
-                "self_output_dir": str(self.output_dir),
-                "cfg_output_dir": str(getattr(cfg, "output_dir", None)),
-                "hydra_runtime_output_dir": str(HydraConfig.get().runtime.output_dir),
-                "wandb_log_dir_arg": str(self.output_dir),
-                "wandb_logging_id": str(getattr(cfg.logging, "id", None)),
-                "wandb_logging_resume": str(getattr(cfg.logging, "resume", None)),
-            }
-        )
-        # #endregion
         wandb_run = wandb.init(
             dir=str(self.output_dir),
             config=OmegaConf.to_container(cfg, resolve=True),
             **cfg.logging
         )
-        # #region agent log
-        _debug_log_wandb(
-            run_id="pre-fix",
-            hypothesis_id="H1_H4",
-            location="train.py:after-wandb-init",
-            message="state right after wandb.init",
-            data={
-                "wandb_run_id": str(getattr(wandb_run, "id", None)),
-                "wandb_run_name": str(getattr(wandb_run, "name", None)),
-                "wandb_cfg_output_dir_pre_update": str(wandb.config.get("output_dir", None)),
-            }
-        )
-        # #endregion
-        # #region agent log
-        _debug_log_wandb(
-            run_id="pre-fix",
-            hypothesis_id="H2",
-            location="train.py:before-config-update",
-            message="value that will be written by wandb.config.update",
-            data={
-                "update_output_dir_value": str(self.output_dir),
-            }
-        )
-        # #endregion
         wandb.config.update(
             {
                 "output_dir": self.output_dir,
@@ -337,18 +201,6 @@ class TrainFlowPolicyWorkspace:
                 f"to keep log steps monotonically increasing.",
                 "yellow")
             self.global_step = wandb_step + 1
-        # #region agent log
-        _debug_log_wandb(
-            run_id="post-fix",
-            hypothesis_id="H1_H2_H4",
-            location="train.py:after-config-update",
-            message="wandb.config.update completed without exception",
-            data={
-                "wandb_cfg_output_dir_post_update": str(wandb.config.get("output_dir", None)),
-                "allow_val_change": True,
-            }
-        )
-        # #endregion
 
         # configure checkpoint
         topk_manager = TopKCheckpointManager(
@@ -529,12 +381,35 @@ class TrainFlowPolicyWorkspace:
         # load the latest checkpoint
         
         cfg = copy.deepcopy(self.cfg)
-        
-        lastest_ckpt_path = self.get_checkpoint_path(tag="latest")
-        if lastest_ckpt_path.is_file():
-            cprint(f"Resuming from checkpoint {lastest_ckpt_path}", 'magenta')
-            self.load_checkpoint(path=lastest_ckpt_path)
-        
+
+        # Prioritas sumber checkpoint (fail-fast, no silent skip):
+        #   1) cfg.eval.checkpoint_path (override eksplisit dari CLI Hydra)
+        #   2) self.output_dir/checkpoints/latest.ckpt
+        explicit_ckpt = None
+        try:
+            explicit_ckpt = cfg.get("eval", {}).get("checkpoint_path", None)
+        except Exception:
+            explicit_ckpt = None
+
+        if explicit_ckpt:
+            lastest_ckpt_path = pathlib.Path(str(explicit_ckpt)).expanduser()
+        else:
+            lastest_ckpt_path = self.get_checkpoint_path(tag="latest")
+
+        if not lastest_ckpt_path.is_file():
+            raise FileNotFoundError(
+                "Tidak menemukan checkpoint untuk eval.\n"
+                f"  Dicari di: {lastest_ckpt_path}\n"
+                "Pastikan training sudah menyimpan checkpoint "
+                "(`checkpoint.save_ckpt=True`) lalu salah satu:\n"
+                "  - arahkan eval ke run_dir training yang benar "
+                "(`hydra.run.dir=<train_run_dir>`), atau\n"
+                "  - beri path ckpt langsung lewat "
+                "`+eval.checkpoint_path=/path/ke/latest.ckpt`.")
+
+        cprint(f"Resuming from checkpoint {lastest_ckpt_path}", 'magenta')
+        self.load_checkpoint(path=lastest_ckpt_path)
+
         # configure env
         env_runner: BaseRunner
         env_runner = hydra.utils.instantiate(
