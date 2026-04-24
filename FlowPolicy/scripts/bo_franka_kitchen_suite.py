@@ -1,21 +1,13 @@
 #!/usr/bin/env python3
 """Orkestrasi eksperimen Franka Kitchen: 3 seed × (tanpa preprocess | preprocess).
 
-Alur default:
-  1) Jalankan Bayesian optimization (``bayes_opt_kitchen.py``) **6 kali** —
-     untuk tiga seed, masing-masing sekali tanpa ``--preprocess`` dan sekali
-     dengan ``--preprocess``.
-  2) Baca ``best_trial.json`` tiap arm, pilih **checkpoint pemenang lokal**.
-  3) Inferensi **tanpa video** pada setiap pemenang → SR + latensi
-     ke ``suite_eval.csv``.
-  4) Pilih **model global terbaik** menurut ``test_mean_score`` eval.
-  5) Inferensi **dengan video** hanya untuk pemenang global → ``hero_best/``.
-
-Catatan:
-  - Mode default BO tetap sekuensial (kompatibel lama).
-  - ``--n-trials`` default = 1 (satu trial per arm, bisa dinaikkan manual).
-  - Aktifkan ``--parallel-bo`` + ``--gpu-pool 0,1,...`` agar dua arm BO
-    bisa berjalan paralel di GPU berbeda.
+Alur:
+  1) Jalankan Bayesian optimization (``bayes_opt_kitchen.py``) 6 kali:
+     seed 0/42/101 × (nopre, pre), semuanya sekuensial di satu GPU.
+  2) Ambil best trial tiap arm (best_trial.json) lalu checkpoint terbaik lokal.
+  3) Inferensi no-video untuk semua checkpoint terbaik -> SR + latensi + metrik SR.
+  4) Pilih model terbaik global (berdasarkan test_mean_score).
+  5) Inferensi hero (dengan video) untuk model global terbaik.
 """
 from __future__ import annotations
 
@@ -27,7 +19,6 @@ import os
 import pathlib
 import subprocess
 import sys
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -47,45 +38,13 @@ def _study_name(tag: str) -> str:
     return f"frk_bo_{tag}"
 
 
-def _run_cmd(
-    cmd: List[str],
-    cwd: pathlib.Path,
-    env: Dict[str, str],
-    log_path: pathlib.Path,
-) -> int:
+def _run_cmd(cmd: List[str], cwd: pathlib.Path, env: Dict[str, str], log_path: pathlib.Path) -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "w", encoding="utf-8") as logf:
         logf.write(f"# cmd: {' '.join(cmd)}\n")
         logf.flush()
-        proc = subprocess.Popen(
-            cmd, cwd=str(cwd), stdout=logf, stderr=subprocess.STDOUT, env=env
-        )
+        proc = subprocess.Popen(cmd, cwd=str(cwd), stdout=logf, stderr=subprocess.STDOUT, env=env)
         return proc.wait()
-
-
-def _spawn_cmd(
-    cmd: List[str],
-    cwd: pathlib.Path,
-    env: Dict[str, str],
-    log_path: pathlib.Path,
-) -> subprocess.Popen:
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    logf = open(log_path, "w", encoding="utf-8")
-    logf.write(f"# cmd: {' '.join(cmd)}\n")
-    logf.flush()
-    proc = subprocess.Popen(
-        cmd, cwd=str(cwd), stdout=logf, stderr=subprocess.STDOUT, env=env
-    )
-    setattr(proc, "_suite_logf", logf)
-    return proc
-
-
-def _close_spawn_log(proc: subprocess.Popen) -> None:
-    try:
-        logf = getattr(proc, "_suite_logf")
-        logf.close()
-    except Exception:
-        pass
 
 
 def _read_best_trial(out_root: pathlib.Path) -> Optional[Dict[str, Any]]:
@@ -99,14 +58,6 @@ def _read_best_trial(out_root: pathlib.Path) -> Optional[Dict[str, Any]]:
 def _ckpt_from_best(out_root: pathlib.Path, train_seed: int, best: Dict[str, Any]) -> pathlib.Path:
     n = int(best["number"])
     return (out_root / f"trial_{n:05d}_seed{train_seed}" / "checkpoints" / "latest.ckpt").resolve()
-
-
-def _parse_gpu_pool(args_gpu: str, gpu_pool_arg: str) -> List[str]:
-    raw = gpu_pool_arg.strip() if gpu_pool_arg else args_gpu.strip()
-    gpus = [x.strip() for x in raw.split(",") if x.strip()]
-    if not gpus:
-        raise SystemExit("GPU pool kosong. Gunakan --gpu 0 atau --gpu-pool 0,1,2,3")
-    return gpus
 
 
 def _build_bo_cmd(
@@ -145,7 +96,7 @@ def _build_bo_cmd(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Suite BO Franka Kitchen: 3 seed × 2 preprocess")
+    parser = argparse.ArgumentParser(description="Suite BO Franka Kitchen: 3 seed × 2 preprocess (single GPU)")
     parser.add_argument(
         "--suite-root",
         type=str,
@@ -160,30 +111,10 @@ def main() -> int:
         help="Daftar seed eksperimen (default: 0 42 101).",
     )
     parser.add_argument("--n-trials", type=int, default=1)
-    parser.add_argument(
-        "--bo-episodes", type=int, default=50, help="Episode infer mini di dalam BO (per trial)."
-    )
-    parser.add_argument(
-        "--eval-episodes",
-        type=int,
-        default=50,
-        help="Episode infer eval setelah BO (tanpa video) untuk semua pemenang arm.",
-    )
-    parser.add_argument(
-        "--hero-episodes", type=int, default=20, help="Episode infer dengan video untuk model global terbaik."
-    )
-    parser.add_argument("--gpu", type=str, default="0", help="GPU tunggal (mode sekuensial).")
-    parser.add_argument(
-        "--gpu-pool",
-        type=str,
-        default="",
-        help="Daftar GPU dipisah koma untuk BO paralel, contoh: 0,1,2,3",
-    )
-    parser.add_argument(
-        "--parallel-bo",
-        action="store_true",
-        help="Jalankan arm BO paralel; GPU dialokasikan round-robin dari --gpu-pool.",
-    )
+    parser.add_argument("--bo-episodes", type=int, default=50)
+    parser.add_argument("--eval-episodes", type=int, default=50)
+    parser.add_argument("--hero-episodes", type=int, default=20)
+    parser.add_argument("--gpu", type=str, default="0", help="GPU tunggal.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--skip-bo",
@@ -194,12 +125,10 @@ def main() -> int:
     args = parser.parse_args()
 
     inner = _flowpolicy_inner()
-    script_py = pathlib.Path(__file__).resolve()
-    bo_py = script_py.parent / "bayes_opt_kitchen.py"
+    bo_py = pathlib.Path(__file__).resolve().parent / "bayes_opt_kitchen.py"
     suite_root = (inner / args.suite_root).resolve()
     hero_dir = suite_root / "hero_best"
-    gpu_pool = _parse_gpu_pool(args.gpu, args.gpu_pool)
-    eval_gpu = gpu_pool[0]
+    run_gpu = str(args.gpu)
 
     env = os.environ.copy()
     env["HYDRA_FULL_ERROR"] = "1"
@@ -213,12 +142,9 @@ def main() -> int:
             arms.append((tag, suite_root / tag, s, pre))
 
     if args.dry_run:
-        mode = "PARALEL" if args.parallel_bo else "SEKUENSIAL"
-        print(f"[suite] dry-run — mode BO: {mode}; gpu-pool={gpu_pool}")
+        print(f"[suite] dry-run — mode BO: SEKUENSIAL; gpu={run_gpu}")
         print(f"[suite] perintah BO yang akan dijalankan ({len(arms)} arm):")
-        for i, (tag, _out, s, pre) in enumerate(arms):
-            gpu_for_arm = gpu_pool[i % len(gpu_pool)]
-            study = _study_name(tag)
+        for tag, _out, s, pre in arms:
             cmd = _build_bo_cmd(
                 py=py,
                 bo_py=bo_py,
@@ -226,88 +152,39 @@ def main() -> int:
                 seed=s,
                 episodes=args.bo_episodes,
                 out_root=f"{args.suite_root}/{tag}",
-                study_name=study,
-                gpu_id=gpu_for_arm,
+                study_name=_study_name(tag),
+                gpu_id=run_gpu,
                 preprocess=pre,
                 no_mem_cap=args.no_mem_cap,
             )
-            print(f"  [gpu {gpu_for_arm}] " + " ".join(cmd))
-        print(
-            f"[suite] lalu eval (infer_kitchen --no-video) per arm, lalu hero (dengan video) di {hero_dir}"
-        )
+            print(f"  [gpu {run_gpu}] " + " ".join(cmd))
+        print(f"[suite] lalu eval (infer_kitchen --no-video) per arm, lalu hero (dengan video) di {hero_dir}")
         return 0
 
     if not args.skip_bo:
         suite_root.mkdir(parents=True, exist_ok=True)
-        if args.parallel_bo:
-            print(f"[suite] BO paralel aktif. gpu-pool={gpu_pool}")
-            running: List[Tuple[str, pathlib.Path, subprocess.Popen]] = []
-            for i, (tag, out, s, pre) in enumerate(arms):
-                gpu_for_arm = gpu_pool[i % len(gpu_pool)]
-                study = _study_name(tag)
-                cmd = _build_bo_cmd(
-                    py=py,
-                    bo_py=bo_py,
-                    n_trials=args.n_trials,
-                    seed=s,
-                    episodes=args.bo_episodes,
-                    out_root=f"{args.suite_root}/{tag}",
-                    study_name=study,
-                    gpu_id=gpu_for_arm,
-                    preprocess=pre,
-                    no_mem_cap=args.no_mem_cap,
-                )
-                logp = out / "suite_bo_subprocess.log"
-                arm_env = env.copy()
-                arm_env["CUDA_VISIBLE_DEVICES"] = gpu_for_arm
-                proc = _spawn_cmd(cmd, inner, arm_env, logp)
-                print(f"[suite] launch arm {tag} on gpu {gpu_for_arm} pid={proc.pid} log={logp}")
-                running.append((tag, logp, proc))
-
-            failed: List[Tuple[str, int, pathlib.Path]] = []
-            while running:
-                pending: List[Tuple[str, pathlib.Path, subprocess.Popen]] = []
-                for tag, logp, proc in running:
-                    rc = proc.poll()
-                    if rc is None:
-                        pending.append((tag, logp, proc))
-                        continue
-                    _close_spawn_log(proc)
-                    print(f"[suite] selesai arm {tag} rc={rc} log={logp}")
-                    if rc != 0:
-                        failed.append((tag, rc, logp))
-                if pending:
-                    time.sleep(5.0)
-                running = pending
-            if failed:
-                for tag, rc, logp in failed:
-                    print(f"[suite] ERROR arm {tag} rc={rc} log={logp}", file=sys.stderr)
-                return 1
-        else:
-            run_gpu = gpu_pool[0]
-            print(f"[suite] BO sekuensial aktif. gpu={run_gpu}")
-            for tag, out, s, pre in arms:
-                study = _study_name(tag)
-                cmd = _build_bo_cmd(
-                    py=py,
-                    bo_py=bo_py,
-                    n_trials=args.n_trials,
-                    seed=s,
-                    episodes=args.bo_episodes,
-                    out_root=f"{args.suite_root}/{tag}",
-                    study_name=study,
-                    gpu_id=run_gpu,
-                    preprocess=pre,
-                    no_mem_cap=args.no_mem_cap,
-                )
-                logp = out / "suite_bo_subprocess.log"
-                run_env = env.copy()
-                run_env["CUDA_VISIBLE_DEVICES"] = run_gpu
-                print(f"\n[suite] === BO arm {tag} ===\n[suite] log: {logp}")
-                rc = _run_cmd(cmd, inner, run_env, logp)
-                if rc != 0:
-                    print(f"[suite] ERROR arm {tag} rc={rc}", file=sys.stderr)
-                    return rc
+        print(f"[suite] BO sekuensial aktif. gpu={run_gpu}")
+        for tag, out, s, pre in arms:
+            cmd = _build_bo_cmd(
+                py=py,
+                bo_py=bo_py,
+                n_trials=args.n_trials,
+                seed=s,
+                episodes=args.bo_episodes,
+                out_root=f"{args.suite_root}/{tag}",
+                study_name=_study_name(tag),
+                gpu_id=run_gpu,
+                preprocess=pre,
+                no_mem_cap=args.no_mem_cap,
+            )
+            logp = out / "suite_bo_subprocess.log"
+            run_env = env.copy()
+            run_env["CUDA_VISIBLE_DEVICES"] = run_gpu
+            print(f"\n[suite] === BO arm {tag} ===\n[suite] log: {logp}")
+            rc = _run_cmd(cmd, inner, run_env, logp)
+            if rc != 0:
+                print(f"[suite] ERROR arm {tag} rc={rc}", file=sys.stderr)
+                return rc
 
     rows: List[Dict[str, Any]] = []
     for tag, out, s, pre in arms:
@@ -362,7 +239,7 @@ def main() -> int:
         logp = ckpt.parent.parent / "infer_suite_eval.log"
         print(f"[suite] eval {r['tag']} -> {out_eval}")
         eval_env = env.copy()
-        eval_env["CUDA_VISIBLE_DEVICES"] = eval_gpu
+        eval_env["CUDA_VISIBLE_DEVICES"] = run_gpu
         rc = _run_cmd(cmd, inner, eval_env, logp)
         metrics_p = out_eval / "metrics.json"
         sr, lat_ms = float("nan"), float("nan")
@@ -411,12 +288,12 @@ def main() -> int:
         json.dump(winner, f, indent=2, default=str)
 
     metric_winners: Dict[str, Dict[str, Any]] = {}
-    target_metrics = sorted(
-        [k for k in metric_keys_union if k == "test_mean_score" or k.startswith("SR_")]
-    )
+    target_metrics = sorted([k for k in metric_keys_union if k == "test_mean_score" or k.startswith("SR_")])
     for mk in target_metrics:
         col = f"metric_{mk}"
-        candidates = [e for e in eval_rows if e.get("eval_rc") == 0 and math.isfinite(float(e.get(col, float("nan"))))]
+        candidates = [
+            e for e in eval_rows if e.get("eval_rc") == 0 and math.isfinite(float(e.get(col, float("nan"))))
+        ]
         if not candidates:
             continue
         best_m = max(candidates, key=lambda e: float(e.get(col, float("-inf"))))
@@ -429,6 +306,7 @@ def main() -> int:
         }
     with open(suite_root / "suite_winner_by_metric.json", "w", encoding="utf-8") as f:
         json.dump(metric_winners, f, indent=2, default=str)
+
     print(
         f"\n[suite] PEMENANG GLOBAL: {winner['tag']}  SR={winner['eval_test_mean_score']:.4f}  "
         f"lat={winner['eval_mean_latency_ms']:.1f} ms"
@@ -452,7 +330,7 @@ def main() -> int:
     log_hero = suite_root / "hero_infer.log"
     print(f"\n[suite] inferensi HERO (dengan video) -> {hero_dir}")
     hero_env = env.copy()
-    hero_env["CUDA_VISIBLE_DEVICES"] = eval_gpu
+    hero_env["CUDA_VISIBLE_DEVICES"] = run_gpu
     rc = _run_cmd(cmd_hero, inner, hero_env, log_hero)
     if rc != 0:
         print(f"[suite] hero infer rc={rc}", file=sys.stderr)
