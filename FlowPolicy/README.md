@@ -294,6 +294,7 @@ Skrip: `scripts/bo_franka_kitchen_suite.py` (wrapper `bo_franka_kitchen_suite.sh
 cd FlowPolicy
 bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
 bash scripts/bo_franka_kitchen_suite.sh 0 --n-trials 30 --bo-episodes 50
+bash scripts/bo_franka_kitchen_suite.sh 0 --parallel-bo --gpu-pool 0,1,2,3,4,5 --n-trials 30
 ```
 
 Argumen berguna:
@@ -303,6 +304,8 @@ Argumen berguna:
 - `--bo-episodes` — episode infer mini di dalam BO (diteruskan ke `bayes_opt_kitchen.py`).
 - `--eval-episodes` — episode infer **tanpa video** setelah BO untuk SR + latensi tiap arm.
 - `--hero-episodes` — episode infer **dengan video** hanya untuk model global terbaik.
+- `--parallel-bo` — jalankan 6 arm BO secara paralel.
+- `--gpu-pool` — daftar GPU untuk BO paralel (contoh `0,1,2,3,4,5`), alokasi round-robin per arm.
 - `--skip-bo` — hanya agregasi + eval + hero (enam subfolder BO sudah selesai).
 
 Keluaran utama di bawah `--suite-root`:
@@ -332,7 +335,7 @@ cd /workspace/FlowPolicy
 bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
 ```
 
-Run penuh (6 arm = 3 seed × 2 preprocess), simpan log ke file:
+Run penuh (mode default sekuensial, 1 GPU), simpan log ke file:
 
 ```bash
 cd /workspace/FlowPolicy
@@ -346,6 +349,27 @@ nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
 echo "PID: $(pgrep -f bo_franka_kitchen_suite.py || echo '(tidak jalan)')"
 echo "Log: /tmp/bo_suite.log"
 ```
+
+Untuk Vast.ai multi-GPU (disarankan), jalankan BO paralel agar beberapa GPU aktif
+bersamaan:
+
+```bash
+cd /workspace/FlowPolicy
+export MUJOCO_GL=egl
+nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
+  --parallel-bo \
+  --gpu-pool 0,1,2,3,4,5 \
+  --n-trials 30 \
+  --bo-episodes 50 \
+  --eval-episodes 50 \
+  --hero-episodes 20 \
+  > /tmp/bo_suite_parallel.log 2>&1 &
+echo "Log: /tmp/bo_suite_parallel.log"
+```
+
+Contoh jika instance Anda punya 8 GPU dan ingin pakai semua saat BO, gunakan:
+`--gpu-pool 0,1,2,3,4,5,6,7` (arm hanya 6, jadi 2 GPU akan idle kecuali Anda
+menambah job lain).
 
 Monitoring:
 

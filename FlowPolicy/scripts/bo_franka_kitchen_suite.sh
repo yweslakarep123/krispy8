@@ -4,6 +4,7 @@
 #
 #   bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
 #   bash scripts/bo_franka_kitchen_suite.sh 0 --n-trials 30
+#   bash scripts/bo_franka_kitchen_suite.sh 0 --parallel-bo --gpu-pool 0,1,2,3,4,5
 # Argumen pertama = id GPU (sama konvensi dengan bayes_opt_kitchen.sh).
 set -euo pipefail
 gpu_id="${1:-0}"
