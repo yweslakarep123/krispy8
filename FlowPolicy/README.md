@@ -283,24 +283,23 @@ Prasyarat: `pip install matplotlib`.
 
 ### Suite eksperimen (3 seed × preprocess on/off = 6× BO)
 
-Untuk desain: **tiga seed pelatihan berbeda** × **dua mode** (dataset tanpa /
-dengan preprocess) = **enam** jalur BO terpisah. Pada tiap jalur, objektif BO
-hanya memakai **seed suite tersebut** (bukan mean tiga seed sekaligus), agar
-selaras dengan “tiga replika independen”.
+Untuk desain: **tiga seed** (`0, 42, 101`) dan tiap seed punya **dua mode**
+(dataset tanpa preprocess dan dengan preprocess) = **enam** jalur BO terpisah.
 
 Skrip: `scripts/bo_franka_kitchen_suite.py` (wrapper `bo_franka_kitchen_suite.sh`).
 
 ```bash
 cd FlowPolicy
 bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
-bash scripts/bo_franka_kitchen_suite.sh 0 --n-trials 30 --bo-episodes 50
-bash scripts/bo_franka_kitchen_suite.sh 0 --parallel-bo --gpu-pool 0,1,2,3,4,5 --n-trials 30
+bash scripts/bo_franka_kitchen_suite.sh 0 --suite-seeds 0 42 101 --n-trials 1 --bo-episodes 50
+bash scripts/bo_franka_kitchen_suite.sh 0 --suite-seeds 0 42 101 --n-trials 1 --parallel-bo --gpu-pool 0,1,2,3,4,5
 ```
 
 Argumen berguna:
 
 - `--suite-root` — induk keluaran (default `data/outputs/bo_franka_suite/`).
-- `--suite-seeds` — daftar seed (default `0 42 101`).
+- `--suite-seeds` — daftar seed eksperimen (default `0 42 101`).
+- `--n-trials` — jumlah trial BO per arm (default `1`).
 - `--bo-episodes` — episode infer mini di dalam BO (diteruskan ke `bayes_opt_kitchen.py`).
 - `--eval-episodes` — episode infer **tanpa video** setelah BO untuk SR + latensi tiap arm.
 - `--hero-episodes` — episode infer **dengan video** hanya untuk model global terbaik.
@@ -312,10 +311,11 @@ Keluaran utama di bawah `--suite-root`:
 
 | Berkas / folder | Isi |
 |-----------------|-----|
-| `seed<S>_nopre/`, `seed<S>_pre/` | Satu studi Optuna + trial per arm |
+| `seed<S>_nopre/`, `seed<S>_pre/` | Enam arm BO total (3 seed × pre/non-pre) |
 | `suite_arms.json` | Ringkasan best trial + path checkpoint tiap arm |
-| `suite_eval.csv` | SR eval (`test_mean_score`) + latensi (ms) tiap arm |
-| `suite_winner.json` | Arm pemenang menurut SR pada `suite_eval.csv` |
+| `suite_eval.csv` | SR overall + metrik SR lain (mis. `SR_*`) + latensi (ms) |
+| `suite_winner.json` | Pemenang overall (berdasarkan `test_mean_score`) |
+| `suite_winner_by_metric.json` | Pemenang per metrik SR (mis. `SR_*` per-task) |
 | `hero_best/` | Inferensi pemenang: `videos/*.mp4`, `metrics.json` |
 
 #### Quick run di Vast.ai
@@ -341,7 +341,8 @@ Run penuh (mode default sekuensial, 1 GPU), simpan log ke file:
 cd /workspace/FlowPolicy
 export MUJOCO_GL=egl
 nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
-  --n-trials 30 \
+  --suite-seeds 0 42 101 \
+  --n-trials 1 \
   --bo-episodes 50 \
   --eval-episodes 50 \
   --hero-episodes 20 \
@@ -350,8 +351,7 @@ echo "PID: $(pgrep -f bo_franka_kitchen_suite.py || echo '(tidak jalan)')"
 echo "Log: /tmp/bo_suite.log"
 ```
 
-Untuk Vast.ai multi-GPU (disarankan), jalankan BO paralel agar beberapa GPU aktif
-bersamaan:
+Untuk Vast.ai multi-GPU (disarankan), jalankan 6 arm BO paralel:
 
 ```bash
 cd /workspace/FlowPolicy
@@ -359,17 +359,14 @@ export MUJOCO_GL=egl
 nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
   --parallel-bo \
   --gpu-pool 0,1,2,3,4,5 \
-  --n-trials 30 \
+  --suite-seeds 0 42 101 \
+  --n-trials 1 \
   --bo-episodes 50 \
   --eval-episodes 50 \
   --hero-episodes 20 \
   > /tmp/bo_suite_parallel.log 2>&1 &
 echo "Log: /tmp/bo_suite_parallel.log"
 ```
-
-Contoh jika instance Anda punya 8 GPU dan ingin pakai semua saat BO, gunakan:
-`--gpu-pool 0,1,2,3,4,5,6,7` (arm hanya 6, jadi 2 GPU akan idle kecuali Anda
-menambah job lain).
 
 Monitoring:
 

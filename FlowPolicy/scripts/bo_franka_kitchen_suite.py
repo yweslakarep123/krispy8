@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Orkestrasi eksperimen Franka Kitchen: 3 seed × (tanpa preprocess | preprocess).
 
-Alur:
+Alur default:
   1) Jalankan Bayesian optimization (``bayes_opt_kitchen.py``) **6 kali** —
-     untuk setiap seed suite ``S``, sekali tanpa ``--preprocess`` dan sekali
+     untuk tiga seed, masing-masing sekali tanpa ``--preprocess`` dan sekali
      dengan ``--preprocess``.
   2) Baca ``best_trial.json`` tiap arm, pilih **checkpoint pemenang lokal**.
   3) Inferensi **tanpa video** pada setiap pemenang → SR + latensi
@@ -13,8 +13,9 @@ Alur:
 
 Catatan:
   - Mode default BO tetap sekuensial (kompatibel lama).
-  - Aktifkan ``--parallel-bo`` + ``--gpu-pool 0,1,2,...`` agar arm BO
-    berjalan paralel di beberapa GPU (ideal untuk Vast.ai multi-GPU).
+  - ``--n-trials`` default = 1 (satu trial per arm, bisa dinaikkan manual).
+  - Aktifkan ``--parallel-bo`` + ``--gpu-pool 0,1,...`` agar dua arm BO
+    bisa berjalan paralel di GPU berbeda.
 """
 from __future__ import annotations
 
@@ -156,9 +157,9 @@ def main() -> int:
         type=int,
         nargs="+",
         default=[0, 42, 101],
-        help="Tiga seed eksperimen (masing-masing × preprocess on/off).",
+        help="Daftar seed eksperimen (default: 0 42 101).",
     )
-    parser.add_argument("--n-trials", type=int, default=30)
+    parser.add_argument("--n-trials", type=int, default=1)
     parser.add_argument(
         "--bo-episodes", type=int, default=50, help="Episode infer mini di dalam BO (per trial)."
     )
@@ -214,7 +215,7 @@ def main() -> int:
     if args.dry_run:
         mode = "PARALEL" if args.parallel_bo else "SEKUENSIAL"
         print(f"[suite] dry-run — mode BO: {mode}; gpu-pool={gpu_pool}")
-        print("[suite] perintah BO yang akan dijalankan:")
+        print(f"[suite] perintah BO yang akan dijalankan ({len(arms)} arm):")
         for i, (tag, _out, s, pre) in enumerate(arms):
             gpu_for_arm = gpu_pool[i % len(gpu_pool)]
             study = _study_name(tag)
@@ -337,6 +338,7 @@ def main() -> int:
         return 1
 
     eval_rows: List[Dict[str, Any]] = []
+    metric_keys_union: set[str] = set()
     for r in rows:
         ckpt = pathlib.Path(r["ckpt"])
         if not ckpt.is_file():
@@ -364,17 +366,23 @@ def main() -> int:
         rc = _run_cmd(cmd, inner, eval_env, logp)
         metrics_p = out_eval / "metrics.json"
         sr, lat_ms = float("nan"), float("nan")
+        metrics_extra: Dict[str, float] = {}
         if rc == 0 and metrics_p.is_file():
             with open(metrics_p, "r", encoding="utf-8") as f:
                 m = json.load(f)
             sr = float(m.get("test_mean_score", float("nan")))
             lat_ms = float(m.get("mean_time", 0.0)) * 1000.0
+            for k, v in m.items():
+                if isinstance(v, (int, float)):
+                    metrics_extra[k] = float(v)
+                    metric_keys_union.add(k)
         eval_rows.append(
             {
                 **r,
                 "eval_rc": rc,
                 "eval_test_mean_score": sr,
                 "eval_mean_latency_ms": lat_ms,
+                **{f"metric_{k}": v for k, v in metrics_extra.items()},
             }
         )
 
@@ -401,10 +409,32 @@ def main() -> int:
     hero_dir.mkdir(parents=True, exist_ok=True)
     with open(suite_root / "suite_winner.json", "w", encoding="utf-8") as f:
         json.dump(winner, f, indent=2, default=str)
+
+    metric_winners: Dict[str, Dict[str, Any]] = {}
+    target_metrics = sorted(
+        [k for k in metric_keys_union if k == "test_mean_score" or k.startswith("SR_")]
+    )
+    for mk in target_metrics:
+        col = f"metric_{mk}"
+        candidates = [e for e in eval_rows if e.get("eval_rc") == 0 and math.isfinite(float(e.get(col, float("nan"))))]
+        if not candidates:
+            continue
+        best_m = max(candidates, key=lambda e: float(e.get(col, float("-inf"))))
+        metric_winners[mk] = {
+            "tag": best_m.get("tag"),
+            "seed": best_m.get("suite_seed"),
+            "preprocess": best_m.get("preprocess"),
+            "value": float(best_m.get(col)),
+            "ckpt": best_m.get("ckpt"),
+        }
+    with open(suite_root / "suite_winner_by_metric.json", "w", encoding="utf-8") as f:
+        json.dump(metric_winners, f, indent=2, default=str)
     print(
         f"\n[suite] PEMENANG GLOBAL: {winner['tag']}  SR={winner['eval_test_mean_score']:.4f}  "
         f"lat={winner['eval_mean_latency_ms']:.1f} ms"
     )
+    if metric_winners:
+        print(f"[suite] winner per metrik SR -> {suite_root / 'suite_winner_by_metric.json'}")
     print(f"[suite] ckpt: {win_path}")
 
     cmd_hero = [
