@@ -1,0 +1,69 @@
+# cmd: /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/trial_00000_seed0 training.seed=0 training.device=cuda training.debug=False exp_name=bayes_opt logging.name=bayes_trial_00000_seed0 logging.mode=offline checkpoint.save_ckpt=True training.resume=False training.num_epochs=1000 optimizer.lr=1e-05 dataloader.batch_size=64 val_dataloader.batch_size=64 policy.Conditional_ConsistencyFM.num_segments=2 policy.Conditional_ConsistencyFM.eps=1 policy.Conditional_ConsistencyFM.delta=0.01 n_action_steps=8 n_obs_steps=16 policy.down_dims=[192,384,768] policy.diffusion_step_embed_dim=256 policy.kernel_size=5 policy.n_groups=2 policy.encoder_output_dim=32 policy.state_mlp_size=[256,256] policy.action_clip=2 policy.encoder_use_layernorm=true policy.use_down_condition=true policy.use_mid_condition=true policy.use_up_condition=true
+[LowdimEncoder] state_dim=70 out_channel=32 hidden_dims=(256, 256)
+[2026-04-24 16:49:16,934][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 4.365633e+07
+----------------------------------
+Class name: FlowPolicyLowdim
+  Number of parameters: 43.7495M
+   _dummy_variable: 0.0000M (0.00%)
+   obs_encoder: 0.0932M (0.21%)
+   model: 43.6563M (99.79%)
+   mask_generator: 0.0000M (0.00%)
+----------------------------------
+[KitchenDataset] loading minari dataset 'D4RL/kitchen/complete-v2'
+[KitchenDataset] loaded 19 episodes, 4209 total steps
+[KitchenDataset] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+[KitchenDataset] order filter: tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'], skipped=0 episode(s) not matching order
+[KitchenDataset] preprocessing disabled: episodes train/val/test=18/1/0
+[KitchenDataset] agent_pos_dim=70 action_dim=9 robot_obs_dim(for noise)=59
+[2026-04-24 16:49:17,732][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+-----------------------------
+[WandB] group: bayes_opt
+[WandB] name: bayes_trial_00000_seed0
+-----------------------------
+wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id 82cf3wkk.
+wandb: Tracking run with wandb version 0.26.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/trial_00000_seed0/wandb/offline-run-20260424_164917-82cf3wkk
+Training epoch 0:   0%|          | 0/63 [00:00<?, ?it/s]Training epoch 0:  16%|█▌        | 10/63 [00:01<00:05,  9.68it/s, loss=0]Training epoch 0:  43%|████▎     | 27/63 [00:02<00:02, 13.44it/s, loss=0]Training epoch 0:  68%|██████▊   | 43/63 [00:03<00:01, 14.57it/s, loss=0]Training epoch 0:  94%|█████████▎| 59/63 [00:04<00:00, 15.12it/s, loss=0]                                                                         Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s][KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+                                                                                Error executing job with overrides: ['task=kitchen_complete', 'training.seed=0', 'training.device=cuda', 'training.debug=False', 'exp_name=bayes_opt', 'logging.name=bayes_trial_00000_seed0', 'logging.mode=offline', 'checkpoint.save_ckpt=True', 'training.resume=False', 'training.num_epochs=1000', 'optimizer.lr=1e-05', 'dataloader.batch_size=64', 'val_dataloader.batch_size=64', 'policy.Conditional_ConsistencyFM.num_segments=2', 'policy.Conditional_ConsistencyFM.eps=1', 'policy.Conditional_ConsistencyFM.delta=0.01', 'n_action_steps=8', 'n_obs_steps=16', 'policy.down_dims=[192,384,768]', 'policy.diffusion_step_embed_dim=256', 'policy.kernel_size=5', 'policy.n_groups=2', 'policy.encoder_output_dim=32', 'policy.state_mlp_size=[256,256]', 'policy.action_clip=2', 'policy.encoder_use_layernorm=true', 'policy.use_down_condition=true', 'policy.use_mid_condition=true', 'policy.use_up_condition=true']
+Traceback (most recent call last):
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 574, in <module>
+    main()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 223, in run_and_report
+    raise ex
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+        ^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 571, in main
+    workspace.run()
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 301, in run
+    runner_log = env_runner.run(policy)
+                 ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/env_runner/kitchen_runner.py", line 208, in run
+    action_dict = policy.predict_action(obs_dict_input)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/policy/flowpolicy_lowdim.py", line 197, in predict_action
+    pred_sigma = pred + (sigma_t ** 2) / (
+                        ^^^^^^^^^^^^^^^^^^
+ZeroDivisionError: float division by zero
+[1;34mwandb[0m: 
+[1;34mwandb[0m: You can sync this run to the cloud by running:
+[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/trial_00000_seed0/wandb/offline-run-20260424_164917-82cf3wkk[0m
+[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/bayes_opt/trial_00000_seed0/wandb/offline-run-20260424_164917-82cf3wkk/logs[0m

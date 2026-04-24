@@ -190,277 +190,181 @@ Catatan:
   lebih pendek dari `horizon` dan menyebabkan padding konstan agresif di
   `SequenceSampler`. Pastikan `round(window_ratio * T) >= horizon`.
 
-## OFAT hyperparameter sweep (8 HP x 4 nilai x 3 seed = 96 run)
+## Bayesian optimization (hyperparameter tuning)
 
-Skrip `scripts/ofat_search_kitchen.py` meng-eksplorasi **setiap** hyperparameter
-satu per satu (One-Factor-At-a-Time), menahan yang lain di nilai baseline.
+Sweep OFAT, grid search, dan random search diganti **satu** pipeline:
+`scripts/bayes_opt_kitchen.py` (wrapper `bayes_opt_kitchen.sh`). Tujuannya sama
+dengan ide Bayesian optimization pada umumnya: evaluasi satu konfigurasi
+(training + inferensi) **mahal**, jadi kita ingin **sedikit iterasi** namun
+**mengarah** ke kombinasi HP yang bagus, dengan **belajar dari hasil trial
+sebelumnya** (bukan mencoba semua kombinasi seperti grid, juga bukan murni
+acak seperti random search skala besar).
 
-Baseline:
+### Mengapa BO (bukan grid / random penuh)?
 
-| hyperparameter                                  | baseline |
-|-------------------------------------------------|----------|
-| `training.num_epochs`                           | 3000     |
-| `optimizer.lr`                                  | 1e-4     |
-| `dataloader.batch_size`                         | 128      |
-| `policy.Conditional_ConsistencyFM.num_segments` | 2        |
-| `policy.Conditional_ConsistencyFM.eps`          | 1e-2     |
-| `policy.Conditional_ConsistencyFM.delta`        | 1e-2     |
-| `n_action_steps`                                | 4        |
-| `n_obs_steps`                                   | 4        |
+- **Efisien saat evaluasi mahal** — deep learning + simulasi kitchen memakan
+  waktu; BO menghemat trial dibanding brute-force.
+- **Pembelajaran berkelanjutan** — setiap trial memperbarui model internal
+  sampler tentang wilayah HP yang menjanjikan.
+- **Eksplorasi vs eksploitasi** — fase awal (`--n-startup-trials`) mengeksplorasi;
+  setelahnya sampler mengarahkan ke area yang terbukti baik sambil tetap
+  menjelajah secukupnya.
 
-Untuk tiap hyperparameter, 4 nilai dari ruang sampling dijalankan (total 32
-konfigurasi), tiap konfigurasi di 3 seed `[0, 42, 101]`, evaluasi 50 episode.
+### Komponen “surrogate” dan “acquisition” di repo ini
 
-Menjalankan:
+Di literatur klasik, BO sering digambarkan sebagai **Gaussian Process**
+(surrogate) + **Expected Improvement** (acquisition). Itu ideal untuk ruang
+**kontinu** berdimensi rendah. Di FlowPolicy, ruang HP kita **dominan diskrit /
+kategorikal** (19 dimensi, banyak pilihan per kartu). Implementasi yang umum
+dan stabil di HPO deep learning adalah **TPE (Tree-structured Parzen
+Estimator)** lewat Optuna:
 
-```bash
-cd FlowPolicy
-bash scripts/ofat_search_kitchen.sh 0 --dry-run          # cek 32 konfigurasi
-bash scripts/ofat_search_kitchen.sh 0                    # full sweep di GPU 0 (tanpa preprocessing)
-bash scripts/ofat_search_kitchen.sh 0 --preprocess       # full sweep di GPU 0 (semua run pakai preprocessing)
-bash scripts/ofat_search_kitchen.sh 0 --only-hp optimizer.lr   # hanya sweep lr
-bash scripts/ofat_search_kitchen.sh 0 --max-minutes 600   # stop setelah 10 jam (Colab T4)
-```
+| Konsep teksbuku | Setara praktis di skrip ini |
+|-----------------|-----------------------------|
+| Surrogate model | Dua kepadatan Parzen: ``p(x \| y baik)`` vs ``p(x \| y buruk)`` dari riwayat trial (TPE). Opsi default **multivariate** memodelkan ketergantungan antar HP bersamaan. |
+| Acquisition | Pemilihan kandidat berikutnya memaksimalkan rasio / skor dari kedua kepadatan di atas (bukan EI eksplisit, tetapi peran serupa: “di mana mencoba berikutnya?”). |
+| Inisialisasi acak | `--n-startup-trials` trial pertama sebelum TPE “mengambil alih”. |
 
-Jika `--preprocess` aktif, OFAT meneruskan override
-`task.dataset.preprocess.*` ke **setiap** perintah training (`cfg_idx x seed`),
-jadi semua run yang dieksekusi memakai preprocessing (bukan hanya run tertentu).
+Ini **tetap** Bayesian optimization dalam arti *sequential model-based
+optimization*; hanya **bukan** GP+EI literal. Jika Anda butuh GP+EI khusus,
+biasanya memerlukan ruang kontinu + dependensi seperti BoTorch (di luar cakupan
+skrip default ini).
 
-Keluaran:
+### Alur satu trial
 
-- mode default (tanpa `--preprocess`) -> `data/outputs/ofat_search/`
-- mode preprocessing (`--preprocess`) -> `data/outputs/ofat_search_preprocess/`
-  (auto-suffix agar hasil dua mode tidak saling menimpa saat resume)
+1. Sampler Optuna mengusulkan vektor HP (dari model internal setelah trial
+   cukup banyak).
+2. Konfigurasi tidak valid → *prune* (tanpa train).
+3. Train + infer mini-eval per seed; objektif = **mean** `test_mean_score`.
+4. Hasil masuk ke `study.db` dan memperbarui TPE untuk trial berikutnya.
 
-Isi folder output:
+Detail teknis:
 
-- `configs.json` — 32 konfigurasi unik
-- `cfg_<ii>_seed<s>/` — run_dir per (konfigurasi, seed)
-- `results.csv` — satu baris per run (96 bila lengkap)
-- `summary.csv` — mean +/- std per konfigurasi di 3 seed, diurutkan dari
-  `test_mean_score` tertinggi ke terendah
+- Kombinasi tidak valid (`n_groups` vs `policy.down_dims`) → *prune*.
+- `--no-mem-cap` mematikan penurunan otomatis batch untuk UNet lebar.
+- Resume: `metrics.json` yang valid untuk `trial_<nnnnn>_seed<s>/` dilewati.
+- Storage: `sqlite:///<out-root>/study.db` (lanjutkan dengan menjalankan ulang
+  perintah yang sama).
+- `--no-tpe-multivariate` memaksa TPE univariat (lebih cepat, kurang memodelkan
+  interaksi antar HP).
 
-Resume otomatis via `metrics.json` di tiap run_dir.
-
-### Isolasi model antar hyperparameter
-
-Setiap kombinasi `(cfg_idx, seed)` mendapat folder kerja sendiri
-`<out-root>/cfg_<ii>_seed<s>/` dengan `hydra.run.dir` yang unik per run.
-Checkpoint hanya dibaca/ditulis dari folder itu, sehingga tidak ada
-konfigurasi yang melanjutkan dari bobot konfigurasi lain. `training.resume`
-hanya melanjutkan ckpt **dalam run_dir yang sama** (berguna bila proses
-crash/timeout di tengah). Bila Anda ingin memaksa training ulang dari
-awal untuk kombinasi tertentu, cukup hapus `<run_dir>/checkpoints/`
-sebelum menjalankan ulang OFAT.
-
-### Evaluasi & inferensi untuk semua 96 run OFAT
-
-Setelah sweep training selesai, pakai dua skrip berikut untuk
-re-evaluasi/rollout semua kombinasi tanpa training ulang:
-
-```bash
-# Evaluasi cepat (tanpa video, hanya SR + latency): hasil di eval_results.csv
-bash scripts/ofat_eval_kitchen.sh 0
-
-# Inferensi lengkap (dengan video mp4 per episode): hasil di infer_results.csv
-bash scripts/ofat_infer_kitchen.sh 0
-
-# Mode preprocessing (out-root otomatis ke ofat_search_preprocess)
-bash scripts/ofat_infer_kitchen.sh 0 --preprocess
-
-# Dry-run: cek mapping cfg -> ckpt yang akan dipakai
-bash scripts/ofat_infer_kitchen.sh 0 --dry-run
-
-# Batasi scope (sweep HP tertentu / seed tertentu / cfg_idx tertentu)
-bash scripts/ofat_infer_kitchen.sh 0 --only-hp optimizer.lr
-bash scripts/ofat_infer_kitchen.sh 0 --only-cfg 0 4 8 --seeds 0 42
-```
-
-Output per run (di `cfg_<ii>_seed<s>/`):
-
-- `inference_ep50/videos/episode_000.mp4 ...` (hanya untuk `ofat_infer_kitchen.sh`)
-- `inference_ep50[_novideo]/metrics.json` berisi antara lain:
-  - `test_mean_score`: success rate rata-rata per episode
-  - `mean_time`: latensi rata-rata per panggilan `predict_action` (detik)
-  - `mean_n_completed_tasks`: jumlah sub-task yang terselesaikan
-- `infer_stdout.log` atau `eval_stdout.log`
-
-Agregasi ke CSV di `<out-root>/`:
-
-- `infer_results.csv` (dari `ofat_infer_kitchen.sh`)
-- `eval_results.csv`  (dari `ofat_eval_kitchen.sh`)
-
-Resume otomatis: run yang `metrics.json`-nya sudah ada tidak akan
-dijalankan ulang kecuali Anda pakai `--force`.
-
-### Plot perbandingan (SR & latency vs HP)
-
-```bash
-# Pakai hasil ofat_infer_kitchen.sh (default)
-bash scripts/ofat_plot_kitchen.sh
-
-# Mode preprocessing
-bash scripts/ofat_plot_kitchen.sh --preprocess
-
-# Pakai eval_results.csv (hasil ofat_eval_kitchen.sh)
-bash scripts/ofat_plot_kitchen.sh --metric-source eval
-
-# Pakai results.csv dari sweep training (tidak butuh infer terpisah)
-bash scripts/ofat_plot_kitchen.sh --metric-source search
-
-# Atau CSV kustom
-bash scripts/ofat_plot_kitchen.sh --csv /path/ke/custom.csv
-```
-
-Keluaran di `<out-root>/plots/`:
-
-- `ofat_sr_vs_hp.png` — 8 subplot: success rate (mean±std) vs nilai HP.
-- `ofat_latency_vs_hp.png` — 8 subplot: latency inferensi (ms) vs nilai HP.
-- `ofat_sr_and_latency.png` — 8 subplot gabungan (dual y-axis).
-- `ofat_summary.csv` — rekap `mean±std` SR & latency per `(swept_hp, value)`.
-
-Prasyarat: `pip install matplotlib`. Plot dibuat dengan backend `Agg`
-sehingga aman dijalankan headless (vast.ai / SSH tanpa display).
-
-## Grid Search (subset HP, full cartesian)
-
-OFAT hanya mengubah satu HP sekaligus — tidak menangkap interaksi antar-HP.
-Untuk eksplorasi kombinasi, tersedia pipeline grid search:
-
-- `FlowPolicy/scripts/gridsearch_kitchen.sh` + `gridsearch_kitchen.py`
-- `FlowPolicy/scripts/gridsearch_infer_kitchen.sh` + `gridsearch_eval_kitchen.sh`
-- `FlowPolicy/scripts/gridsearch_plot_kitchen.sh`
-
-Grid full untuk 20 HP × 4 nilai tidak realistis (triliunan run). Jadi grid
-search dijalankan pada **subset** HP yang dipilih; semua HP lain dikunci ke
-baseline `flowpolicy.yaml`.
-
-### 11 HP model baru (di luar 8 HP lama)
-
-Semua HP model ini bisa di-subset lewat `--override-hp`. 4 nilai per HP
-(2 untuk boolean) dipilih supaya reasonable dan saling kompatibel
-(`n_groups` sengaja dibatasi agar selalu membagi semua channel di setiap
-`down_dims`).
-
-| HP | Kategori | 4 (atau 2) nilai default | Argumen |
-|---|---|---|---|
-| `policy.down_dims` | skala UNet | `[128,256,512]`, `[192,384,768]`, `[256,512,1024]`, `[384,768,1536]` | Kapasitas model — trade-off SR vs latency/memori. |
-| `policy.diffusion_step_embed_dim` | cond waktu | `64, 128, 256, 512` | Ekspresivitas embedding timestep CFM. |
-| `policy.kernel_size` | temporal | `3, 5, 7, 9` | Receptive field Conv1D di UNet. |
-| `policy.n_groups` | GroupNorm | `1, 2, 4, 8` | Normalisasi; `8` aman universal (habis bagi semua `down_dims`). |
-| `policy.encoder_output_dim` | encoder obs | `32, 64, 128, 256` | Dim fitur observasi yang masuk ke global cond. |
-| `policy.state_mlp_size` | encoder obs | `[128,128]`, `[256,256]`, `[512,512]`, `[256,256,256]` | Kapasitas & kedalaman MLP encoder. |
-| `policy.action_clip` | stabilitas | `0.5, 1.0, 2.0, 5.0` | Clamp output action — stabilitas inferensi. |
-| `policy.encoder_use_layernorm` | stabilitas (bool) | `true, false` | LayerNorm di encoder obs. |
-| `policy.use_down_condition` | conditioning (bool) | `true, false` | Pakai cond di down blocks. |
-| `policy.use_mid_condition` | conditioning (bool) | `true, false` | Pakai cond di mid blocks. |
-| `policy.use_up_condition` | conditioning (bool) | `true, false` | Pakai cond di up blocks. |
-
-`policy.condition_type` **tidak** di-sweep (dikunci `film` sesuai
-`flowpolicy.yaml`).
-
-### Subset default (preset `default`)
-
-7 HP, 1296 run (= 432 kombinasi × 3 seed):
-
-| HP | nilai yang disweep |
-|---|---|
-| `optimizer.lr` | `1e-3, 1e-4, 1e-5` |
-| `dataloader.batch_size` | `64, 128, 256` |
-| `policy.Conditional_ConsistencyFM.num_segments` | `2, 3` |
-| `policy.down_dims` | `[128,256,512]`, `[256,512,1024]`, `[384,768,1536]` |
-| `policy.diffusion_step_embed_dim` | `128, 256` |
-| `policy.kernel_size` | `3, 5` |
-| `policy.use_mid_condition` | `true, false` |
-
-Alternatif preset: `smoke` (4 HP, 16 kombinasi, 48 run) untuk verifikasi pipeline.
-
-### Isolasi per run (penting)
-
-Setiap `(cfg_idx, seed)` membuat `run_dir` baru `<out-root>/cfg_<4digit>_seed<s>/`
-dengan `hydra.run.dir` unik dan **`training.resume=False` dipaksa** di
-override. Ini memastikan setiap konfigurasi melatih model **dari nol**,
-tidak melanjutkan bobot konfigurasi lain. Auto-resume by `metrics.json`
-hanya berlaku dalam run_dir yang sama (recovery crash/timeout).
-
-Kombinasi HP invalid (mis. `n_groups` tidak membagi `down_dims`) otomatis
-dilewati dengan status `skipped_invalid`.
-
-### Menjalankan training grid
+Prasyarat: `pip install optuna` (ada di `scripts/colab_install.sh`).
 
 ```bash
 cd FlowPolicy
-
-# 1) dry-run: inspeksi kombinasi yang akan dijalankan
-bash scripts/gridsearch_kitchen.sh 0 --dry-run
-
-# 2) full sweep (preset default) — ~1296 run di GPU 0
-bash scripts/gridsearch_kitchen.sh 0
-
-# 3) mode preprocessing (out-root otomatis gridsearch_preprocess)
-bash scripts/gridsearch_kitchen.sh 0 --preprocess
-
-# 4) batas waktu (mis. 11 jam, Colab Free T4)
-bash scripts/gridsearch_kitchen.sh 0 --max-minutes 660
-
-# 5) preset kecil untuk verifikasi pipeline
-bash scripts/gridsearch_kitchen.sh 0 --subset smoke
-
-# 6) override subset HP (separator nilai ':' ; list pakai '[]')
-bash scripts/gridsearch_kitchen.sh 0 \
-  --override-hp optimizer.lr=1e-3:5e-4:1e-4 \
-  --override-hp policy.down_dims=[128,256,512]:[256,512,1024] \
-  --override-hp policy.use_mid_condition=true:false
+bash scripts/bayes_opt_kitchen.sh 0 --dry-run
+bash scripts/bayes_opt_kitchen.sh 0 --n-trials 30
+bash scripts/bayes_opt_kitchen.sh 0 --n-trials 50 --max-minutes 660
+bash scripts/bayes_opt_kitchen.sh 0 --preprocess --n-trials 20
 ```
 
-Output di `<out-root>/` (default `data/outputs/gridsearch/`):
+Keluaran di `<out-root>/` (default `data/outputs/bayes_opt/`; dengan
+`--preprocess` → `data/outputs/bayes_opt_preprocess/`):
 
-- `configs.json` — seluruh kombinasi + HP penuhnya
-- `cfg_<4digit>_seed<s>/` — run_dir per (kombinasi, seed)
-- `results.csv` — per run (hasil inferensi mini 50 ep yang dijalankan otomatis)
-- `summary.csv` — mean±std per kombinasi (ter-urut `test_mean_score_mean`)
-- `progress.log` — progres baris per run
+- `study.db` — basis data Optuna (riwayat trial). Bila Anda mengubah daftar
+  nilai HP di skrip dan studi lama error *dynamic value space*, hapus
+  `study.db` (dan opsional `trials.csv`) atau gunakan `--study-name` baru.
+- `trials.csv` — satu baris per trial sukses: `trial_number`, `value` (mean SR),
+  `config_json` (HP lengkap).
+- `best_trial.json` — ringkasan trial terbaik setelah run selesai.
+- `trial_<nnnnn>_seed<s>/` — `hydra.run.dir` per trial×seed (`train_stdout.log`,
+  `infer_stdout.log`, checkpoint, `metrics.json`).
 
-### Evaluasi & inferensi semua run grid
-
-Sama pola dengan OFAT, tapi dibaca dari `configs.json` grid (bukan mapping
-OFAT hardcoded).
+### Plot riwayat optimisasi
 
 ```bash
-# Evaluasi cepat (tanpa video), hasil di eval_results.csv
-bash scripts/gridsearch_eval_kitchen.sh 0
-
-# Inferensi lengkap (video + metrik), hasil di infer_results.csv
-bash scripts/gridsearch_infer_kitchen.sh 0
-
-# Mode preprocessing
-bash scripts/gridsearch_infer_kitchen.sh 0 --preprocess
-
-# Subset run saja
-bash scripts/gridsearch_infer_kitchen.sh 0 --only-cfg 0 1 2 --seeds 0 42
+cd FlowPolicy
+bash scripts/bayes_opt_plot_kitchen.sh
+# atau: python scripts/bayes_opt_plot_kitchen.py --out-root data/outputs/bayes_opt_preprocess
 ```
 
-### Plot perbandingan (grid search)
-
-```bash
-bash scripts/gridsearch_plot_kitchen.sh                 # infer_results.csv (default)
-bash scripts/gridsearch_plot_kitchen.sh --metric-source eval
-bash scripts/gridsearch_plot_kitchen.sh --metric-source search
-bash scripts/gridsearch_plot_kitchen.sh --preprocess
-```
-
-Keluaran di `<out-root>/plots/`:
-
-- `grid_sr_marginal.png` — SR (mean±std) per HP, di-marginalize atas HP
-  lain. Menjawab: "rata-rata SR kalau HP X = v apa?".
-- `grid_latency_marginal.png` — idem untuk latency (ms).
-- `grid_pair_heatmap.png` — heatmap SR untuk 2 HP paling berdampak
-  (dipilih otomatis berdasar varians marginal SR).
-- `grid_sr_vs_latency.png` — scatter Pareto: satu titik = satu kombinasi.
-- `grid_summary.csv` — rekap mean±std per kombinasi, ter-urut dari SR
-  tertinggi lalu latency terendah.
-
+Menghasilkan `plots/bayes_optimization_history.png` (nilai trial + *best so far*).
 Prasyarat: `pip install matplotlib`.
+
+### Suite eksperimen (3 seed × preprocess on/off = 6× BO)
+
+Untuk desain: **tiga seed pelatihan berbeda** × **dua mode** (dataset tanpa /
+dengan preprocess) = **enam** jalur BO terpisah. Pada tiap jalur, objektif BO
+hanya memakai **seed suite tersebut** (bukan mean tiga seed sekaligus), agar
+selaras dengan “tiga replika independen”.
+
+Skrip: `scripts/bo_franka_kitchen_suite.py` (wrapper `bo_franka_kitchen_suite.sh`).
+
+```bash
+cd FlowPolicy
+bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
+bash scripts/bo_franka_kitchen_suite.sh 0 --n-trials 30 --bo-episodes 50
+```
+
+Argumen berguna:
+
+- `--suite-root` — induk keluaran (default `data/outputs/bo_franka_suite/`).
+- `--suite-seeds` — daftar seed (default `0 42 101`).
+- `--bo-episodes` — episode infer mini di dalam BO (diteruskan ke `bayes_opt_kitchen.py`).
+- `--eval-episodes` — episode infer **tanpa video** setelah BO untuk SR + latensi tiap arm.
+- `--hero-episodes` — episode infer **dengan video** hanya untuk model global terbaik.
+- `--skip-bo` — hanya agregasi + eval + hero (enam subfolder BO sudah selesai).
+
+Keluaran utama di bawah `--suite-root`:
+
+| Berkas / folder | Isi |
+|-----------------|-----|
+| `seed<S>_nopre/`, `seed<S>_pre/` | Satu studi Optuna + trial per arm |
+| `suite_arms.json` | Ringkasan best trial + path checkpoint tiap arm |
+| `suite_eval.csv` | SR eval (`test_mean_score`) + latensi (ms) tiap arm |
+| `suite_winner.json` | Arm pemenang menurut SR pada `suite_eval.csv` |
+| `hero_best/` | Inferensi pemenang: `videos/*.mp4`, `metrics.json` |
+
+#### Quick run di Vast.ai
+
+Gunakan ini bila Anda menjalankan di instance Vast.ai (Ubuntu + GPU). Jalankan
+dari root repo `FlowPolicy`.
+
+```bash
+cd /workspace/FlowPolicy
+bash scripts/colab_install.sh
+```
+
+Lalu cek dulu command yang akan dieksekusi:
+
+```bash
+cd /workspace/FlowPolicy
+bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
+```
+
+Run penuh (6 arm = 3 seed × 2 preprocess), simpan log ke file:
+
+```bash
+cd /workspace/FlowPolicy
+export MUJOCO_GL=egl
+nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
+  --n-trials 30 \
+  --bo-episodes 50 \
+  --eval-episodes 50 \
+  --hero-episodes 20 \
+  > /tmp/bo_suite.log 2>&1 &
+echo "PID: $(pgrep -f bo_franka_kitchen_suite.py || echo '(tidak jalan)')"
+echo "Log: /tmp/bo_suite.log"
+```
+
+Monitoring:
+
+```bash
+tail -n 60 /tmp/bo_suite.log
+```
+
+Setelah run selesai, hasil utama:
+
+- `data/outputs/bo_franka_suite/suite_eval.csv`
+- `data/outputs/bo_franka_suite/suite_winner.json`
+- `data/outputs/bo_franka_suite/hero_best/videos/`
+
+Jika BO 6 arm sudah selesai tapi proses terhenti sebelum evaluasi/video:
+
+```bash
+cd /workspace/FlowPolicy
+bash scripts/bo_franka_kitchen_suite.sh 0 --skip-bo --eval-episodes 50 --hero-episodes 20
+```
 
 ## Menjalankan di Google Colab (Free T4)
 
@@ -491,176 +395,95 @@ persisten antar restart Colab:**
 from google.colab import drive
 drive.mount('/content/drive', force_remount=True)
 !mkdir -p /content/drive/MyDrive/flowpolicy_kitchen_outputs
-!rm -rf /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
-!ln -s /content/drive/MyDrive/flowpolicy_kitchen_outputs /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
+!rm -rf /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
+!ln -s /content/drive/MyDrive/flowpolicy_kitchen_outputs /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
 ```
 
-**Cell 4a - (opsional) cek 32 konfigurasi x 3 seed = 96 run via dry-run.**
-Jangan gunakan `| head`; daftarnya pendek, tampilkan langsung. `| head`
-akan memicu SIGPIPE dan `set -o pipefail` menganggapnya gagal.
+**Cell 4a — dry-run BO (contoh kombinasi HP; menulis header `trials.csv`,
+tanpa `study.db` sampai run penuh):**
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
-bash scripts/ofat_search_kitchen.sh 0 --dry-run
+bash scripts/bayes_opt_kitchen.sh 0 --dry-run
 ```
 
-Untuk dry-run dengan preprocessing:
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-bash scripts/ofat_search_kitchen.sh 0 --preprocess --dry-run
-```
-
-**Cell 4 - jalankan OFAT sweep DI BACKGROUND supaya bisa dipantau dari cell
-lain (Colab `%%bash` membuffer output saat running).** `--max-minutes 660`
-memberi budget 11 jam (sisakan buffer untuk timeout 12h Colab Free).
+**Cell 4 — jalankan Bayesian optimization di background** (`--max-minutes`
+opsional, sama seperti sebelumnya untuk OFAT).
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
 export MUJOCO_GL=egl
-# kill sisa proses kalau ada, lalu jalankan di background
-pkill -f ofat_search_kitchen.py 2>/dev/null || true
-nohup bash scripts/ofat_search_kitchen.sh 0 --max-minutes 660 \
-    > /tmp/ofat_master.log 2>&1 &
+pkill -f bayes_opt_kitchen.py 2>/dev/null || true
+nohup bash scripts/bayes_opt_kitchen.sh 0 --n-trials 30 --max-minutes 660 \
+    > /tmp/bo_master.log 2>&1 &
 sleep 2
-echo "Sweep PID: $(pgrep -f ofat_search_kitchen.py || echo '(tidak jalan)')"
-echo "Master log: /tmp/ofat_master.log"
-echo "Progress log : data/outputs/ofat_search/progress.log"
+echo "BO PID: $(pgrep -f bayes_opt_kitchen.py || echo '(tidak jalan)')"
+echo "Master log: /tmp/bo_master.log"
+echo "Progress: data/outputs/bayes_opt/progress.log"
 ```
 
-Jika ingin mode preprocessing di Colab:
+Mode preprocessing: ganti perintah menjadi
+`bash scripts/bayes_opt_kitchen.sh 0 --preprocess --n-trials 20 ...` dan
+folder progres ke `data/outputs/bayes_opt_preprocess/`.
+
+**Cell 5 — pantau progress:**
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
-export MUJOCO_GL=egl
-pkill -f ofat_search_kitchen.py 2>/dev/null || true
-nohup bash scripts/ofat_search_kitchen.sh 0 --preprocess --max-minutes 660 \
-    > /tmp/ofat_master.log 2>&1 &
-sleep 2
-echo "Sweep PID: $(pgrep -f ofat_search_kitchen.py || echo '(tidak jalan)')"
-echo "Master log: /tmp/ofat_master.log"
-echo "Progress log : data/outputs/ofat_search_preprocess/progress.log"
+tail -n 40 data/outputs/bayes_opt/progress.log 2>/dev/null || true
+echo "Masih jalan? $(pgrep -f bayes_opt_kitchen.py >/dev/null && echo YES || echo NO)"
 ```
 
-**Cell 5 - pantau progress satu baris per run (paling ringkas):**
+**Cell 6 — tail master log:**
+
+```bash
+%%bash
+tail -n 60 /tmp/bo_master.log
+```
+
+**Cell 7 — trial terbaru (train/infer):**
+
+```bash
+%%bash
+cd /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
+latest=$(ls -td trial_* 2>/dev/null | head -n 1)
+echo "Terbaru: $latest"
+tail -n 30 "$latest/train_stdout.log" 2>/dev/null || true
+tail -n 20 "$latest/infer_stdout.log" 2>/dev/null || true
+```
+
+**Cell 8 — ringkasan (`trials.csv` + `best_trial.json`):**
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
-# Tampilkan hanya baris [PROGRESS n/96] dari progress.log, live
-# (ganti folder ke ofat_search_preprocess jika mode preprocessing aktif)
-grep -n "^\[PROGRESS" data/outputs/ofat_search/progress.log 2>/dev/null | tail -n 30
-echo "---"
-echo "Jumlah selesai: $(grep -c '^\[PROGRESS' data/outputs/ofat_search/progress.log 2>/dev/null || echo 0) / 96"
-echo "Sweep masih jalan? $(pgrep -f ofat_search_kitchen.py >/dev/null && echo YES || echo NO)"
+tail -n 15 data/outputs/bayes_opt/trials.csv 2>/dev/null || true
+cat data/outputs/bayes_opt/best_trial.json 2>/dev/null || echo "(belum selesai)"
 ```
 
-Jalankan cell 5 berulang kali (Ctrl+Enter) untuk refresh. Contoh output:
-```
-[PROGRESS   1/96] cfg_00 seed=0   [training.num_epochs=500] SR=0.2150 status=ok t_train=  420s t_infer=  55s elapsed=00:07:55 eta=12:25:00
-[PROGRESS   2/96] cfg_00 seed=42  [training.num_epochs=500] SR=0.1875 status=ok ...
-```
-
-**Cell 6 - live tail master log (output penuh dari semua training/inferensi):**
+**Cell 9 — hentikan BO:**
 
 ```bash
 %%bash
-tail -n 60 /tmp/ofat_master.log
+pkill -f bayes_opt_kitchen.py && echo dihentikan || echo tidak ada proses
 ```
 
-**Cell 7 - lihat log run aktif paling baru (train/infer):**
+Setelah restart Colab, jalankan ulang cell 4: trial/seed yang sudah punya
+`metrics.json` valid akan dilewati.
 
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy/data/outputs/ofat_search
-latest=$(ls -td cfg_* 2>/dev/null | head -n 1)
-echo "Run aktif terbaru: $latest"
-echo "===== train_stdout.log (tail) ====="
-tail -n 40 "$latest/train_stdout.log" 2>/dev/null || echo "(belum ada)"
-echo "===== infer_stdout.log (tail) ====="
-tail -n 40 "$latest/infer_stdout.log" 2>/dev/null || echo "(belum ada)"
-```
-
-**Cell 8 - setelah selesai: cek summary top-10:**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-ls data/outputs/ofat_search/
-echo "----- summary.csv (top 10) -----"
-head -n 11 data/outputs/ofat_search/summary.csv
-```
-
-**Cell 9 (opsional) - hentikan sweep di tengah jalan:**
-
-```bash
-%%bash
-pkill -f ofat_search_kitchen.py && echo "dihentikan" || echo "tidak ada proses"
-```
-
-Bila runtime Colab restart sebelum 96 run selesai, jalankan ulang cell 4
-— skrip otomatis skip `(cfg, seed)` yang sudah punya `metrics.json` valid.
-
-**Cell 10 (opsional) - inferensi 50 episode manual dari 1 checkpoint:**
+**Cell 10 (opsional) — inferensi manual dari checkpoint trial terbaik**
+(sesuaikan path dari `best_trial.json` atau folder `trial_*`):
 
 ```bash
 %%bash
 cd /content/flowpolicy_kitchen/FlowPolicy
 python infer_kitchen.py \
-  --checkpoint data/outputs/ofat_search/cfg_00_seed0/checkpoints/latest.ckpt \
+  --checkpoint data/outputs/bayes_opt/trial_00000_seed0/checkpoints/latest.ckpt \
   --episodes 50 --device cuda:0
 ```
-
-## Random search hyperparameter (alternatif)
-
-Skrip `scripts/random_search_kitchen.py` melakukan random search pada 8
-hyperparameter, 30 konfigurasi acak × 3 seed `[0, 42, 101]`, dengan
-evaluasi akhir 50 episode per run.
-
-Ruang sampling:
-
-| hyperparameter                                   | nilai                                |
-|--------------------------------------------------|--------------------------------------|
-| `training.num_epochs`                            | `[500, 1000, 3000, 5000]`            |
-| `optimizer.lr`                                   | `[1e-3, 5e-4, 1e-4, 1e-5]`           |
-| `dataloader.batch_size`                          | `[64, 128, 256, 512]`                |
-| `policy.Conditional_ConsistencyFM.num_segments`  | `[1, 2, 3, 4]`                       |
-| `policy.Conditional_ConsistencyFM.eps`           | `[1e-2, 1e-3, 1e-4, 1.0]`            |
-| `policy.Conditional_ConsistencyFM.delta`         | `[1e-2, 1e-3, 1e-4, 1.0]`            |
-| `n_action_steps`                                 | `[2, 4, 6, 8]`                       |
-| `n_obs_steps`                                    | `[4, 6, 8, 16]`                      |
-
-`horizon` dihitung otomatis sebagai `max(n_obs_steps + n_action_steps - 1, 4)`.
-
-Menjalankan:
-
-```bash
-cd FlowPolicy
-# dry-run dulu untuk inspeksi 30 konfigurasi
-bash scripts/random_search_kitchen.sh 0 --dry-run
-
-# eksekusi sebenarnya di GPU 0
-bash scripts/random_search_kitchen.sh 0
-```
-
-Keluaran di `data/outputs/random_search/`:
-
-- `configs.json` — daftar 30 konfigurasi yang di-sample (stabil selama
-  `--sampling-seed` tidak berubah).
-- `cfg_<ii>_seed<s>/` — run_dir per (konfigurasi, seed). Berisi
-  `checkpoints/latest.ckpt`, `train_stdout.log`, `infer_stdout.log`, dan
-  `inference_ep50/metrics.json`.
-- `results.csv` — satu baris per run (90 baris bila lengkap).
-- `summary.csv` — ringkasan per konfigurasi: mean ± std `test_mean_score`,
-  `mean_n_completed_tasks`, `mean_time` di 3 seed, **diurutkan** dari
-  terbaik ke terburuk.
-
-Resume otomatis: jika `metrics.json` untuk `(cfg_idx, seed)` tertentu
-sudah valid, skrip melewatinya.
 
 ## Inferensi (checkpoint → video + metrik)
 

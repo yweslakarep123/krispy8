@@ -1,0 +1,27 @@
+[bo] dry-run (mock trial, tidak menulis study.db)
+  sample 0: valid=True  cfg={'training.num_epochs': 5000, 'optimizer.lr': 1e-05, 'dataloader.batch_size': 64, 'policy.Conditional_ConsistencyFM.num_segments': 3, 'policy.Conditional_ConsistencyFM.eps': 1.0, 'policy.Conditional_ConsistencyFM.delta': 1.0, 'n_action_steps': 6, 'n_obs_steps': 16, 'policy.down_dims': [256, 512, 1024], 'policy.diffusion_step_embed_dim': 128, 'policy.kernel_size': 5, 'policy.n_groups': 4, 'policy.encoder_output_dim': 64, 'policy.state_mlp_size': [128, 128], 'policy.action_clip': 2.0, 'policy.encoder_use_layernorm': True, 'policy.use_down_condition': False, 'policy.use_mid_condition': True, 'policy.use_up_condition': True}
+  sample 1: valid=True  cfg={'training.num_epochs': 3000, 'optimizer.lr': 1e-05, 'dataloader.batch_size': 64, 'policy.Conditional_ConsistencyFM.num_segments': 3, 'policy.Conditional_ConsistencyFM.eps': 1.0, 'policy.Conditional_ConsistencyFM.delta': 0.0001, 'n_action_steps': 4, 'n_obs_steps': 16, 'policy.down_dims': [384, 768, 1536], 'policy.diffusion_step_embed_dim': 256, 'policy.kernel_size': 3, 'policy.n_groups': 1, 'policy.encoder_output_dim': 32, 'policy.state_mlp_size': [256, 256, 256], 'policy.action_clip': 0.5, 'policy.encoder_use_layernorm': False, 'policy.use_down_condition': False, 'policy.use_mid_condition': True, 'policy.use_up_condition': False}
+  sample 2: valid=True  cfg={'training.num_epochs': 500, 'optimizer.lr': 0.0005, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.001, 'policy.Conditional_ConsistencyFM.delta': 1.0, 'n_action_steps': 2, 'n_obs_steps': 4, 'policy.down_dims': [256, 512, 1024], 'policy.diffusion_step_embed_dim': 512, 'policy.kernel_size': 3, 'policy.n_groups': 4, 'policy.encoder_output_dim': 128, 'policy.state_mlp_size': [128, 128], 'policy.action_clip': 2.0, 'policy.encoder_use_layernorm': True, 'policy.use_down_condition': False, 'policy.use_mid_condition': False, 'policy.use_up_condition': True}
+[bo] dry-run selesai.
+[bo] dry-run (mock trial, tidak menulis study.db)
+  sample 0: valid=True  cfg={'training.num_epochs': 5000, 'optimizer.lr': 1e-05, 'dataloader.batch_size': 64, 'policy.Conditional_ConsistencyFM.num_segments': 3, 'policy.Conditional_ConsistencyFM.eps': 1.0, 'policy.Conditional_ConsistencyFM.delta': 1.0, 'n_action_steps': 6, 'n_obs_steps': 16, 'policy.down_dims': [256, 512, 1024], 'policy.diffusion_step_embed_dim': 128, 'policy.kernel_size': 5, 'policy.n_groups': 4, 'policy.encoder_output_dim': 64, 'policy.state_mlp_size': [128, 128], 'policy.action_clip': 2.0, 'policy.encoder_use_layernorm': True, 'policy.use_down_condition': False, 'policy.use_mid_condition': True, 'policy.use_up_condition': True}
+  sample 1: valid=True  cfg={'training.num_epochs': 3000, 'optimizer.lr': 1e-05, 'dataloader.batch_size': 64, 'policy.Conditional_ConsistencyFM.num_segments': 3, 'policy.Conditional_ConsistencyFM.eps': 1.0, 'policy.Conditional_ConsistencyFM.delta': 0.0001, 'n_action_steps': 4, 'n_obs_steps': 16, 'policy.down_dims': [384, 768, 1536], 'policy.diffusion_step_embed_dim': 256, 'policy.kernel_size': 3, 'policy.n_groups': 1, 'policy.encoder_output_dim': 32, 'policy.state_mlp_size': [256, 256, 256], 'policy.action_clip': 0.5, 'policy.encoder_use_layernorm': False, 'policy.use_down_condition': False, 'policy.use_mid_condition': True, 'policy.use_up_condition': False}
+  sample 2: valid=True  cfg={'training.num_epochs': 500, 'optimizer.lr': 0.0005, 'dataloader.batch_size': 128, 'policy.Conditional_ConsistencyFM.num_segments': 2, 'policy.Conditional_ConsistencyFM.eps': 0.001, 'policy.Conditional_ConsistencyFM.delta': 1.0, 'n_action_steps': 2, 'n_obs_steps': 4, 'policy.down_dims': [256, 512, 1024], 'policy.diffusion_step_embed_dim': 512, 'policy.kernel_size': 3, 'policy.n_groups': 4, 'policy.encoder_output_dim': 128, 'policy.state_mlp_size': [128, 128], 'policy.action_clip': 2.0, 'policy.encoder_use_layernorm': True, 'policy.use_down_condition': False, 'policy.use_mid_condition': False, 'policy.use_up_condition': True}
+[bo] dry-run selesai.
+[bo] sampler: TPE (BO berbasis kepadatan), multivariate=True
+[bo] study=flowpolicy_kitchen_bo storage=sqlite:////home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/study.db
+[bo] n_trials=30 seeds=[0, 42, 101] out-root=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt
+[bo] VRAM batch cap: ON
+[bo] trial 0 seed 0 train ...
+[bo] trial 0 seed 0 TRAIN FAIL rc=1
+[bo] trial 0 seed 42 train ...
+[bo] sampler: TPE (BO berbasis kepadatan), multivariate=True
+[bo] study=flowpolicy_kitchen_bo storage=sqlite:////home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/study.db
+[bo] n_trials=2 seeds=[0, 42, 101] out-root=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt
+[bo] VRAM batch cap: ON
+[bo] sampler: TPE (BO berbasis kepadatan), multivariate=True
+[bo] study=flowpolicy_kitchen_bo storage=sqlite:////home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt/study.db
+[bo] n_trials=2 seeds=[0, 42, 101] out-root=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/bayes_opt
+[bo] VRAM batch cap: ON
+  [mem-cap] dataloader.batch_size 256 → 64 (max policy.down_dims=1536)
+[bo] trial 2 seed 0 train ...
