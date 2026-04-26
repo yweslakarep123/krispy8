@@ -21,7 +21,8 @@ echo "[colab-install] torch  : $(python -c 'import torch; print(torch.__version_
 # Colab sudah punya torch (biasanya >= 2.3 + cu12x) — tidak di-override agar
 # tidak bentrok dengan driver T4.
 pip install -q \
-    "optuna>=3.0" \
+    "scikit-learn>=1.3" \
+    "matplotlib>=3.7" \
     "gymnasium==1.2.3" \
     "gymnasium-robotics==1.4.2" \
     "minari==0.5.3" \

@@ -190,301 +190,144 @@ Catatan:
   lebih pendek dari `horizon` dan menyebabkan padding konstan agresif di
   `SequenceSampler`. Pastikan `round(window_ratio * T) >= horizon`.
 
-## Bayesian optimization (hyperparameter tuning)
+## HalvingRandomSearchCV (hyperparameter tuning)
 
-Sweep OFAT, grid search, dan random search diganti **satu** pipeline:
-`scripts/bayes_opt_kitchen.py` (wrapper `bayes_opt_kitchen.sh`). Tujuannya sama
-dengan ide Bayesian optimization pada umumnya: evaluasi satu konfigurasi
-(training + inferensi) **mahal**, jadi kita ingin **sedikit iterasi** namun
-**mengarah** ke kombinasi HP yang bagus, dengan **belajar dari hasil trial
-sebelumnya** (bukan mencoba semua kombinasi seperti grid, juga bukan murni
-acak seperti random search skala besar).
+Pipeline tuning hyperparameter sekarang memakai `HalvingRandomSearchCV`
+(`sklearn.model_selection`) melalui:
+`scripts/halving_search_kitchen.py` (wrapper `halving_search_kitchen.sh`).
 
-### Mengapa BO (bukan grid / random penuh)?
+Strategi ini memulai banyak kandidat dengan resource kecil, lalu hanya
+kandidat terbaik yang dilanjutkan ke resource lebih besar.
 
-- **Efisien saat evaluasi mahal** — deep learning + simulasi kitchen memakan
-  waktu; BO menghemat trial dibanding brute-force.
-- **Pembelajaran berkelanjutan** — setiap trial memperbarui model internal
-  sampler tentang wilayah HP yang menjanjikan.
-- **Eksplorasi vs eksploitasi** — fase awal (`--n-startup-trials`) mengeksplorasi;
-  setelahnya sampler mengarahkan ke area yang terbukti baik sambil tetap
-  menjelajah secukupnya.
+### Mengapa Halving Random Search?
 
-### Komponen “surrogate” dan “acquisition” di repo ini
+- Evaluasi kandidat mahal (train + infer), jadi perlu eliminasi dini.
+- Kombinasi HP diuji acak di awal, lalu diseleksi bertahap berdasarkan skor.
+- Resource yang ditingkatkan di sini adalah `episodes` inferensi.
 
-Di literatur klasik, BO sering digambarkan sebagai **Gaussian Process**
-(surrogate) + **Expected Improvement** (acquisition). Itu ideal untuk ruang
-**kontinu** berdimensi rendah. Di FlowPolicy, ruang HP kita **dominan diskrit /
-kategorikal** (19 dimensi, banyak pilihan per kartu). Implementasi yang umum
-dan stabil di HPO deep learning adalah **TPE (Tree-structured Parzen
-Estimator)** lewat Optuna:
+### Cara kerja di repo ini
 
-| Konsep teksbuku | Setara praktis di skrip ini |
-|-----------------|-----------------------------|
-| Surrogate model | Dua kepadatan Parzen: ``p(x \| y baik)`` vs ``p(x \| y buruk)`` dari riwayat trial (TPE). Opsi default **multivariate** memodelkan ketergantungan antar HP bersamaan. |
-| Acquisition | Pemilihan kandidat berikutnya memaksimalkan rasio / skor dari kedua kepadatan di atas (bukan EI eksplisit, tetapi peran serupa: “di mana mencoba berikutnya?”). |
-| Inisialisasi acak | `--n-startup-trials` trial pertama sebelum TPE “mengambil alih”. |
+1. Sampling kandidat HP dari ruang diskrit.
+2. Jalankan train + infer per seed.
+3. Skor kandidat = mean `test_mean_score` lintas seed.
+4. Hanya kandidat terbaik yang lanjut ke iterasi berikut dengan `episodes` lebih besar.
 
-Ini **tetap** Bayesian optimization dalam arti *sequential model-based
-optimization*; hanya **bukan** GP+EI literal. Jika Anda butuh GP+EI khusus,
-biasanya memerlukan ruang kontinu + dependensi seperti BoTorch (di luar cakupan
-skrip default ini).
+### Menjalankan tuning
 
-### Alur satu trial
-
-1. Sampler Optuna mengusulkan vektor HP (dari model internal setelah trial
-   cukup banyak).
-2. Konfigurasi tidak valid → *prune* (tanpa train).
-3. Train + infer mini-eval per seed; objektif = **mean** `test_mean_score`.
-4. Hasil masuk ke `study.db` dan memperbarui TPE untuk trial berikutnya.
-
-Detail teknis:
-
-- Kombinasi tidak valid (`n_groups` vs `policy.down_dims`) → *prune*.
-- `--no-mem-cap` mematikan penurunan otomatis batch untuk UNet lebar.
-- Resume: `metrics.json` yang valid untuk `trial_<nnnnn>_seed<s>/` dilewati.
-- Storage: `sqlite:///<out-root>/study.db` (lanjutkan dengan menjalankan ulang
-  perintah yang sama).
-- `--no-tpe-multivariate` memaksa TPE univariat (lebih cepat, kurang memodelkan
-  interaksi antar HP).
-
-Prasyarat: `pip install optuna` (ada di `scripts/colab_install.sh`).
+Prasyarat: `pip install scikit-learn`.
 
 ```bash
 cd FlowPolicy
-bash scripts/bayes_opt_kitchen.sh 0 --dry-run
-bash scripts/bayes_opt_kitchen.sh 0 --n-trials 30
-bash scripts/bayes_opt_kitchen.sh 0 --n-trials 50 --max-minutes 660
-bash scripts/bayes_opt_kitchen.sh 0 --preprocess --n-trials 20
+bash scripts/halving_search_kitchen.sh 0 --dry-run
+bash scripts/halving_search_kitchen.sh 0 --n-candidates 16 --min-episodes 10 --max-episodes 50
+bash scripts/halving_search_kitchen.sh 0 --n-candidates 24 --factor 3 --min-episodes 8 --max-episodes 60
+bash scripts/halving_search_kitchen.sh 0 --preprocess --n-candidates 16 --min-episodes 10 --max-episodes 50
 ```
 
-Keluaran di `<out-root>/` (default `data/outputs/bayes_opt/`; dengan
-`--preprocess` → `data/outputs/bayes_opt_preprocess/`):
+Argumen penting:
 
-- `study.db` — basis data Optuna (riwayat trial). Bila Anda mengubah daftar
-  nilai HP di skrip dan studi lama error *dynamic value space*, hapus
-  `study.db` (dan opsional `trials.csv`) atau gunakan `--study-name` baru.
-- `trials.csv` — satu baris per trial sukses: `trial_number`, `value` (mean SR),
-  `config_json` (HP lengkap).
-- `best_trial.json` — ringkasan trial terbaik setelah run selesai.
-- `trial_<nnnnn>_seed<s>/` — `hydra.run.dir` per trial×seed (`train_stdout.log`,
-  `infer_stdout.log`, checkpoint, `metrics.json`).
+- `--n-candidates`: jumlah kandidat awal.
+- `--factor`: rasio eliminasi tiap iterasi halving.
+- `--min-episodes`: resource awal (episodes infer).
+- `--max-episodes`: resource maksimum di iterasi akhir.
+- `--seeds`: seed evaluasi (default `0 42 101`).
+- `--preprocess`: aktifkan preprocessing sliding-window.
 
-### Plot riwayat optimisasi
+Keluaran di `<out-root>/` (default `data/outputs/halving_search/`):
+
+- `trials.csv` — log nilai tiap trial yang dieksekusi.
+- `best_trial.json` — ringkasan parameter terbaik dari Halving search.
+- `progress.log` — log progres ringkas.
+- `trial_<nnnnn>_seed<s>/` — folder run train/infer per trial×seed.
+
+### Plot riwayat tuning
 
 ```bash
 cd FlowPolicy
-bash scripts/bayes_opt_plot_kitchen.sh
-# atau: python scripts/bayes_opt_plot_kitchen.py --out-root data/outputs/bayes_opt_preprocess
+bash scripts/halving_plot_kitchen.sh
+# atau:
+python scripts/halving_plot_kitchen.py --out-root data/outputs/halving_search
 ```
 
-Menghasilkan `plots/bayes_optimization_history.png` (nilai trial + *best so far*).
-Prasyarat: `pip install matplotlib`.
+Output default:
 
-### Suite eksperimen (3 seed × preprocess on/off = 6× BO)
+- `plots/halving_search_history.png`
 
-Untuk desain: **tiga seed** (`0, 42, 101`) dan tiap seed punya **dua mode**
-(dataset tanpa preprocess dan dengan preprocess) = **enam** jalur BO terpisah.
+### Training final dari hasil tuning terbaik
 
-Skrip: `scripts/bo_franka_kitchen_suite.py` (wrapper `bo_franka_kitchen_suite.sh`).
+Setelah `best_trial.json` tersedia, jalankan training final:
 
 ```bash
 cd FlowPolicy
-bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
-bash scripts/bo_franka_kitchen_suite.sh 0 --suite-seeds 0 42 101 --n-trials 1 --bo-episodes 50
+bash scripts/train_best_from_halving.sh 0 --seed 0
 ```
 
-Argumen berguna:
-
-- `--suite-root` — induk keluaran (default `data/outputs/bo_franka_suite/`).
-- `--suite-seeds` — daftar seed eksperimen (default `0 42 101`).
-- `--n-trials` — jumlah trial BO per arm (default `1`).
-- `--bo-episodes` — episode infer mini di dalam BO (diteruskan ke `bayes_opt_kitchen.py`).
-- `--eval-episodes` — episode infer **tanpa video** setelah BO untuk SR + latensi tiap arm.
-- `--hero-episodes` — episode infer **dengan video** hanya untuk model global terbaik.
-- `--skip-bo` — hanya agregasi + eval + hero (enam subfolder BO sudah selesai).
-
-Keluaran utama di bawah `--suite-root`:
-
-| Berkas / folder | Isi |
-|-----------------|-----|
-| `seed<S>_nopre/`, `seed<S>_pre/` | Enam arm BO total (3 seed × pre/non-pre) |
-| `suite_arms.json` | Ringkasan best trial + path checkpoint tiap arm |
-| `suite_eval.csv` | SR overall + metrik SR lain (mis. `SR_*`) + latensi (ms) |
-| `suite_winner.json` | Pemenang overall (berdasarkan `test_mean_score`) |
-| `suite_winner_by_metric.json` | Pemenang per metrik SR (mis. `SR_*` per-task) |
-| `hero_best/` | Inferensi pemenang: `videos/*.mp4`, `metrics.json` |
-
-#### Quick run di Vast.ai
-
-Gunakan ini bila Anda menjalankan di instance Vast.ai (Ubuntu + GPU). Jalankan
-dari root repo `FlowPolicy`.
+Contoh dengan path `best_trial.json` custom:
 
 ```bash
-cd /workspace/FlowPolicy
-bash scripts/colab_install.sh
+cd FlowPolicy
+bash scripts/train_best_from_halving.sh 0 \
+  --best-json data/outputs/halving_search/best_trial.json \
+  --seed 42 \
+  --run-dir data/outputs/kitchen_complete-flowpolicy_halving_best_seed42
 ```
 
-Lalu cek dulu command yang akan dieksekusi:
+## Suite eksperimen 12 model (3 seed x 4 skenario)
+
+Skrip orkestrasi: `scripts/experiment_3seed_4arms.py`
+(wrapper `scripts/experiment_3seed_4arms.sh`).
+
+Untuk setiap seed (`0, 42, 101`) dijalankan 4 skenario:
+
+1. `baseline`: tanpa tuning, tanpa preprocessing
+2. `baseline_pre`: tanpa tuning, dengan preprocessing
+3. `tuned`: tuning Halving tanpa preprocessing, lalu train final best params
+4. `tuned_pre`: tuning Halving dengan preprocessing, lalu train final best params
+
+Setelah 12 model selesai:
+
+- pilih pemenang per-seed berdasarkan `test_mean_score`
+- bandingkan 3 pemenang seed untuk juara global
+- jalankan inferensi final juara global (SR + latensi; video opsional)
+
+### Jalankan
 
 ```bash
-cd /workspace/FlowPolicy
-bash scripts/bo_franka_kitchen_suite.sh 0 --dry-run
+cd FlowPolicy
+bash scripts/experiment_3seed_4arms.sh 0 --dry-run
+bash scripts/experiment_3seed_4arms.sh 0
 ```
 
-Run penuh (mode default sekuensial, 1 GPU), simpan log ke file:
+Contoh dengan parameter tuning custom:
 
 ```bash
-cd /workspace/FlowPolicy
-export MUJOCO_GL=egl
-nohup bash scripts/bo_franka_kitchen_suite.sh 0 \
-  --suite-seeds 0 42 101 \
-  --n-trials 1 \
-  --bo-episodes 50 \
+cd FlowPolicy
+bash scripts/experiment_3seed_4arms.sh 0 \
+  --seeds 0 42 101 \
+  --halving-n-candidates 16 \
+  --halving-factor 2 \
+  --halving-min-episodes 10 \
+  --halving-max-episodes 50 \
   --eval-episodes 50 \
-  --hero-episodes 20 \
-  > /tmp/bo_suite.log 2>&1 &
-echo "PID: $(pgrep -f bo_franka_kitchen_suite.py || echo '(tidak jalan)')"
-echo "Log: /tmp/bo_suite.log"
+  --hero-episodes 20
 ```
 
-Monitoring:
+Aktifkan video pada inferensi final juara global:
 
 ```bash
-tail -n 60 /tmp/bo_suite.log
+bash scripts/experiment_3seed_4arms.sh 0 --hero-video
 ```
 
-Setelah run selesai, hasil utama:
+### Output utama
 
-- `data/outputs/bo_franka_suite/suite_eval.csv`
-- `data/outputs/bo_franka_suite/suite_winner.json`
-- `data/outputs/bo_franka_suite/hero_best/videos/`
+Default root output: `data/outputs/exp_3seed_4arms/`
 
-Jika BO 6 arm sudah selesai tapi proses terhenti sebelum evaluasi/video:
-
-```bash
-cd /workspace/FlowPolicy
-bash scripts/bo_franka_kitchen_suite.sh 0 --skip-bo --eval-episodes 50 --hero-episodes 20
-```
-
-## Menjalankan di Google Colab (Free T4)
-
-Semua cell di Colab hanya menjalankan perintah bash; tidak perlu menulis
-ulang kode Python.
-
-**Cell 1 - clone repo (ganti dengan URL repo GitHub Anda):**
-
-```bash
-%%bash
-cd /content
-rm -rf flowpolicy_kitchen
-git clone https://github.com/<USER>/<REPO>.git flowpolicy_kitchen
-```
-
-**Cell 2 - install dependencies + download dataset Minari:**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-bash scripts/colab_install.sh
-```
-
-**Cell 3 - (opsional, sangat disarankan) mount Google Drive agar hasil
-persisten antar restart Colab:**
-
-```python
-from google.colab import drive
-drive.mount('/content/drive', force_remount=True)
-!mkdir -p /content/drive/MyDrive/flowpolicy_kitchen_outputs
-!rm -rf /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
-!ln -s /content/drive/MyDrive/flowpolicy_kitchen_outputs /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
-```
-
-**Cell 4a — dry-run BO (contoh kombinasi HP; menulis header `trials.csv`,
-tanpa `study.db` sampai run penuh):**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-bash scripts/bayes_opt_kitchen.sh 0 --dry-run
-```
-
-**Cell 4 — jalankan Bayesian optimization di background** (`--max-minutes`
-opsional, sama seperti sebelumnya untuk OFAT).
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-export MUJOCO_GL=egl
-pkill -f bayes_opt_kitchen.py 2>/dev/null || true
-nohup bash scripts/bayes_opt_kitchen.sh 0 --n-trials 30 --max-minutes 660 \
-    > /tmp/bo_master.log 2>&1 &
-sleep 2
-echo "BO PID: $(pgrep -f bayes_opt_kitchen.py || echo '(tidak jalan)')"
-echo "Master log: /tmp/bo_master.log"
-echo "Progress: data/outputs/bayes_opt/progress.log"
-```
-
-Mode preprocessing: ganti perintah menjadi
-`bash scripts/bayes_opt_kitchen.sh 0 --preprocess --n-trials 20 ...` dan
-folder progres ke `data/outputs/bayes_opt_preprocess/`.
-
-**Cell 5 — pantau progress:**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-tail -n 40 data/outputs/bayes_opt/progress.log 2>/dev/null || true
-echo "Masih jalan? $(pgrep -f bayes_opt_kitchen.py >/dev/null && echo YES || echo NO)"
-```
-
-**Cell 6 — tail master log:**
-
-```bash
-%%bash
-tail -n 60 /tmp/bo_master.log
-```
-
-**Cell 7 — trial terbaru (train/infer):**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy/data/outputs/bayes_opt
-latest=$(ls -td trial_* 2>/dev/null | head -n 1)
-echo "Terbaru: $latest"
-tail -n 30 "$latest/train_stdout.log" 2>/dev/null || true
-tail -n 20 "$latest/infer_stdout.log" 2>/dev/null || true
-```
-
-**Cell 8 — ringkasan (`trials.csv` + `best_trial.json`):**
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-tail -n 15 data/outputs/bayes_opt/trials.csv 2>/dev/null || true
-cat data/outputs/bayes_opt/best_trial.json 2>/dev/null || echo "(belum selesai)"
-```
-
-**Cell 9 — hentikan BO:**
-
-```bash
-%%bash
-pkill -f bayes_opt_kitchen.py && echo dihentikan || echo tidak ada proses
-```
-
-Setelah restart Colab, jalankan ulang cell 4: trial/seed yang sudah punya
-`metrics.json` valid akan dilewati.
-
-**Cell 10 (opsional) — inferensi manual dari checkpoint trial terbaik**
-(sesuaikan path dari `best_trial.json` atau folder `trial_*`):
-
-```bash
-%%bash
-cd /content/flowpolicy_kitchen/FlowPolicy
-python infer_kitchen.py \
-  --checkpoint data/outputs/bayes_opt/trial_00000_seed0/checkpoints/latest.ckpt \
-  --episodes 50 --device cuda:0
-```
+- `seed0/`, `seed42/`, `seed101/` berisi 4 arm per-seed
+- `all_models_eval.csv` ringkasan 12 model (SR + latensi)
+- `seed_winners.json` pemenang per-seed
+- `global_winner.json` juara global
+- `global_winner_inference/metrics.json` metrik inferensi final juara global
+- `final_summary.json` ringkasan akhir
 
 ## Inferensi (checkpoint → video + metrik)
 
