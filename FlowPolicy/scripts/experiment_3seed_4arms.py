@@ -4,8 +4,8 @@
 Per seed:
 1) baseline      : tanpa tuning, tanpa preprocess
 2) baseline_pre  : tanpa tuning, dengan preprocess
-3) tuned         : halving tuning tanpa preprocess -> train final best params
-4) tuned_pre     : halving tuning dengan preprocess -> train final best params
+3) tuned         : random search tuning tanpa preprocess -> train final best params
+4) tuned_pre     : random search tuning dengan preprocess -> train final best params
 """
 from __future__ import annotations
 
@@ -19,6 +19,13 @@ import subprocess
 import sys
 import time
 from typing import Any, Dict, List, Optional
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
 
 
 def _fmt_value(v: Any) -> str:
@@ -134,13 +141,70 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-episodes", type=int, default=50)
     p.add_argument("--hero-episodes", type=int, default=20)
     p.add_argument("--hero-video", action="store_true", help="Aktifkan video untuk inferensi final juara global.")
-    p.add_argument("--halving-n-candidates", type=int, default=16)
-    p.add_argument("--halving-factor", type=float, default=2.0)
-    p.add_argument("--halving-min-episodes", type=int, default=10)
-    p.add_argument("--halving-max-episodes", type=int, default=50)
-    p.add_argument("--halving-random-state", type=int, default=0)
+    p.add_argument("--random-n-iter", type=int, default=100)
+    p.add_argument("--random-cv", type=int, default=5)
+    p.add_argument("--random-state", type=int, default=0)
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
+
+
+def _plot_all_models(all_rows: List[Dict[str, Any]], plots_dir: pathlib.Path) -> Optional[pathlib.Path]:
+    if plt is None or not all_rows:
+        return None
+    by_arm: Dict[str, List[float]] = {}
+    for r in all_rows:
+        arm = str(r.get("arm", "unknown"))
+        sr = float(r.get("eval_test_mean_score", float("nan")))
+        if math.isfinite(sr):
+            by_arm.setdefault(arm, []).append(sr)
+    if not by_arm:
+        return None
+
+    arms = sorted(by_arm.keys())
+    means = [sum(by_arm[a]) / len(by_arm[a]) for a in arms]
+    counts = [len(by_arm[a]) for a in arms]
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    out = plots_dir / "success_rate_all_models.png"
+    fig, ax = plt.subplots(figsize=(9, 5))
+    bars = ax.bar(arms, means)
+    ax.set_title("Success Rate Semua Model (rata-rata lintas seed)")
+    ax.set_xlabel("Arm")
+    ax.set_ylabel("Success Rate (test_mean_score)")
+    ax.set_ylim(0.0, max(1.0, max(means) * 1.1))
+    for b, m, c in zip(bars, means, counts):
+        ax.text(b.get_x() + b.get_width() / 2, b.get_height(), f"{m:.3f}\n(n={c})", ha="center", va="bottom")
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    return out
+
+
+def _plot_global_winner(summary: Dict[str, Any], plots_dir: pathlib.Path) -> Optional[pathlib.Path]:
+    if plt is None:
+        return None
+    sr = float(summary.get("final_test_mean_score", float("nan")))
+    lat = float(summary.get("final_mean_latency_ms", float("nan")))
+    if not (math.isfinite(sr) and math.isfinite(lat)):
+        return None
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    out = plots_dir / "global_winner_sr_latency.png"
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    ax1.bar(["global_winner"], [sr])
+    ax1.set_title("Success Rate")
+    ax1.set_ylim(0.0, max(1.0, sr * 1.1))
+    ax1.set_ylabel("test_mean_score")
+    ax1.text(0, sr, f"{sr:.3f}", ha="center", va="bottom")
+    ax2.bar(["global_winner"], [lat])
+    ax2.set_title("Latency Inferensi")
+    ax2.set_ylabel("ms per predict_action")
+    ax2.text(0, lat, f"{lat:.2f} ms", ha="center", va="bottom")
+    fig.suptitle("Model Terbaik (dipakai inferensi/video)")
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    return out
 
 
 def main() -> int:
@@ -196,39 +260,37 @@ def main() -> int:
             return rc
         baseline_pre_ckpt = baseline_pre_run / "checkpoints" / "latest.ckpt"
 
-        # tuned (halving -> train best)
+        # tuned (random search -> train best)
         tuned_dir = seed_dir / "tuned"
-        tuned_halving_out = tuned_dir / "halving"
+        tuned_random_out = tuned_dir / "random_search"
         tuned_train_run = tuned_dir / "train_run"
         tuned_dir.mkdir(parents=True, exist_ok=True)
-        halving_cmd = [
+        random_cmd = [
             py,
-            str(here / "halving_search_kitchen.py"),
-            "--n-candidates",
-            str(args.halving_n_candidates),
-            "--factor",
-            str(args.halving_factor),
-            "--min-episodes",
-            str(args.halving_min_episodes),
-            "--max-episodes",
-            str(args.halving_max_episodes),
-            "--seeds",
+            str(here / "random_search_kitchen.py"),
+            "--seed",
             str(seed),
+            "--n-iter",
+            str(args.random_n_iter),
+            "--cv",
+            str(args.random_cv),
             "--out-root",
-            str(tuned_halving_out),
+            str(tuned_random_out),
             "--gpu",
             str(args.gpu),
             "--random-state",
-            str(args.halving_random_state),
+            str(args.random_state),
         ]
-        rc = _run(halving_cmd, flowpolicy_pkg, env, tuned_dir / "halving.log", args.dry_run)
+        if args.dry_run:
+            random_cmd.append("--dry-run")
+        rc = _run(random_cmd, flowpolicy_pkg, env, tuned_dir / "random_search.log", args.dry_run)
         if rc != 0:
             return rc
         train_best_cmd = [
             py,
-            str(here / "train_best_from_halving.py"),
+            str(here / "train_best_from_random.py"),
             "--best-json",
-            str(tuned_halving_out / "best_trial.json"),
+            str(tuned_random_out / "best_trial.json"),
             "--seed",
             str(seed),
             "--gpu",
@@ -241,40 +303,38 @@ def main() -> int:
             return rc
         tuned_ckpt = tuned_train_run / "checkpoints" / "latest.ckpt"
 
-        # tuned_pre (halving preprocess -> train best preprocess)
+        # tuned_pre (random search preprocess -> train best preprocess)
         tuned_pre_dir = seed_dir / "tuned_pre"
-        tuned_pre_halving_out = tuned_pre_dir / "halving"
+        tuned_pre_random_out = tuned_pre_dir / "random_search"
         tuned_pre_train_run = tuned_pre_dir / "train_run"
         tuned_pre_dir.mkdir(parents=True, exist_ok=True)
-        halving_pre_cmd = [
+        random_pre_cmd = [
             py,
-            str(here / "halving_search_kitchen.py"),
-            "--n-candidates",
-            str(args.halving_n_candidates),
-            "--factor",
-            str(args.halving_factor),
-            "--min-episodes",
-            str(args.halving_min_episodes),
-            "--max-episodes",
-            str(args.halving_max_episodes),
-            "--seeds",
+            str(here / "random_search_kitchen.py"),
+            "--seed",
             str(seed),
+            "--n-iter",
+            str(args.random_n_iter),
+            "--cv",
+            str(args.random_cv),
             "--out-root",
-            str(tuned_pre_halving_out),
+            str(tuned_pre_random_out),
             "--gpu",
             str(args.gpu),
             "--random-state",
-            str(args.halving_random_state),
+            str(args.random_state),
             "--preprocess",
         ]
-        rc = _run(halving_pre_cmd, flowpolicy_pkg, env, tuned_pre_dir / "halving.log", args.dry_run)
+        if args.dry_run:
+            random_pre_cmd.append("--dry-run")
+        rc = _run(random_pre_cmd, flowpolicy_pkg, env, tuned_pre_dir / "random_search.log", args.dry_run)
         if rc != 0:
             return rc
         train_best_pre_cmd = [
             py,
-            str(here / "train_best_from_halving.py"),
+            str(here / "train_best_from_random.py"),
             "--best-json",
-            str(tuned_pre_halving_out / "best_trial.json"),
+            str(tuned_pre_random_out / "best_trial.json"),
             "--seed",
             str(seed),
             "--gpu",
@@ -381,9 +441,33 @@ def main() -> int:
     with open(out_root / "final_summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, default=str)
 
+    plots_dir = out_root / "plots"
+    all_plot = _plot_all_models(all_rows, plots_dir)
+    winner_plot = _plot_global_winner(summary, plots_dir)
+    if all_plot:
+        summary["success_rate_plot"] = str(all_plot)
+    if winner_plot:
+        summary["winner_sr_latency_plot"] = str(winner_plot)
+    with open(out_root / "final_summary.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, default=str)
+    with open(out_root / "plot_summary.json", "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "success_rate_plot": str(all_plot) if all_plot else None,
+                "winner_sr_latency_plot": str(winner_plot) if winner_plot else None,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
+
     print(f"[exp] seed winners -> {out_root / 'seed_winners.json'}")
     print(f"[exp] global winner -> {out_root / 'global_winner.json'}")
     print(f"[exp] final summary -> {out_root / 'final_summary.json'}")
+    if all_plot:
+        print(f"[exp] plot all models -> {all_plot}")
+    if winner_plot:
+        print(f"[exp] plot winner -> {winner_plot}")
     return 0
 
 

@@ -1,9 +1,0 @@
-cfg_idx,swept_hp,swept_value,seed,training.num_epochs,optimizer.lr,dataloader.batch_size,policy.Conditional_ConsistencyFM.num_segments,policy.Conditional_ConsistencyFM.eps,policy.Conditional_ConsistencyFM.delta,n_action_steps,n_obs_steps,test_mean_score,mean_n_completed_tasks,mean_time,mean_success_rates,SR_test_L3,SR_test_L5,status,t_train_s,t_infer_s,timestamp
-0,training.num_epochs,500,0,500,0.0001,128,2,0.01,0.01,4,4,0.0,0.0,0.006667450428009033,0.0,0.0,0.0,ok,1851.79,88.04,1776954650
-0,training.num_epochs,500,42,500,0.0001,128,2,0.01,0.01,4,4,0.0,0.0,0.006679947648729597,0.0,0.0,0.0,ok,1854.27,86.39,1776956591
-0,training.num_epochs,500,101,500,0.0001,128,2,0.01,0.01,4,4,0.235,0.94,0.0066688523973737444,0.235,0.235,0.235,ok,1856.8,85.54,1776958533
-1,training.num_epochs,1000,0,1000,0.0001,128,2,0.01,0.01,4,4,0.075,0.3,0.006691780635288783,0.075,0.075,0.075,ok,3687.5,86.9,1776962307
-1,training.num_epochs,1000,42,1000,0.0001,128,2,0.01,0.01,4,4,0.0,0.0,0.006669674260275704,0.0,0.0,0.0,ok,3685.94,86.63,1776966080
-1,training.num_epochs,1000,101,1000,0.0001,128,2,0.01,0.01,4,4,0.0,0.0,0.006702253477913992,0.0,0.0,0.0,ok,3692.76,86.3,1776969859
-2,training.num_epochs,3000,0,3000,0.0001,128,2,0.01,0.01,4,4,0.38,1.52,0.006661755768858753,0.38,0.38,0.38,ok,11099.71,86.06,1776981045
-2,training.num_epochs,3000,42,3000,0.0001,128,2,0.01,0.01,4,4,0.05,0.2,0.006727788720812118,0.05,0.05,0.05,ok,11126.18,88.78,1776992260
