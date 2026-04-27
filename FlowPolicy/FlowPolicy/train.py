@@ -55,6 +55,24 @@ warnings.filterwarnings("ignore")
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
 
+def _enable_gpu_perf_mode():
+    """Aktifkan mode performa GPU jika diminta via env."""
+    if os.environ.get("FLOWP_GPU_PERF_MODE", "0") != "1":
+        return
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            print("[gpu-perf] enabled: cudnn.benchmark=True, tf32=True")
+    except Exception as exc:
+        print(f"[gpu-perf] warning: gagal aktifkan mode performa ({exc})")
+
+
+_enable_gpu_perf_mode()
+
+
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
     exclude_keys = tuple()

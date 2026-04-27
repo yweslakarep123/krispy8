@@ -58,6 +58,26 @@ def _read_metrics(metrics_path: pathlib.Path) -> Dict[str, Any]:
         return json.load(f)
 
 
+def _check_gpu_or_fail(py: str, env: Dict[str, str], gpu_arg: str, dry_run: bool) -> None:
+    if dry_run:
+        print(f"[gpu-check] skip (dry-run), target GPU={gpu_arg}")
+        return
+    cmd = [
+        py,
+        "-c",
+        (
+            "import torch; "
+            "assert torch.cuda.is_available(), 'CUDA tidak tersedia'; "
+            "print(torch.cuda.device_count())"
+        ),
+    ]
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise SystemExit(f"[gpu-check] gagal: {proc.stderr.strip() or proc.stdout.strip()}")
+    out = (proc.stdout or "").strip()
+    print(f"[gpu-check] CUDA ready. visible_device_count={out} (CUDA_VISIBLE_DEVICES={gpu_arg})")
+
+
 def _sample_candidates(rng: random.Random, n_iter: int) -> List[Dict[str, Any]]:
     space = {
         "training.num_epochs": [300, 500, 800, 1000],
@@ -143,6 +163,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-episodes", type=int, default=20)
     p.add_argument("--random-state", type=int, default=0)
     p.add_argument("--preprocess", action="store_true")
+    p.add_argument("--scenario-name", type=str, default="scenario")
+    p.add_argument(
+        "--strict-gpu",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail jika CUDA tidak tersedia.",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -159,6 +186,10 @@ def main() -> int:
     env["CUDA_VISIBLE_DEVICES"] = args.gpu
     env["HYDRA_FULL_ERROR"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    env["FLOWP_GPU_PERF_MODE"] = "1"
+
+    if args.strict_gpu:
+        _check_gpu_or_fail(py, env, args.gpu, args.dry_run)
 
     rng = random.Random(args.random_state + args.seed * 10007 + (1 if args.preprocess else 0))
     candidates = _sample_candidates(rng, args.n_iter)
@@ -168,7 +199,15 @@ def main() -> int:
     rows: List[Dict[str, Any]] = []
     best_row: Dict[str, Any] | None = None
 
+    total_fold_jobs = len(candidates) * args.cv
+    fold_job_idx = 0
+    print(
+        f"[random_search] start scenario={args.scenario_name} seed={args.seed} "
+        f"n_iter={len(candidates)} cv={args.cv} preprocess={args.preprocess}"
+    )
+
     for cfg_idx, params in enumerate(candidates):
+        print(f"[random_search] kandidat {cfg_idx + 1}/{len(candidates)}")
         fold_scores: List[float] = []
         fold_latencies: List[float] = []
         status = "ok"
@@ -180,6 +219,12 @@ def main() -> int:
             json.dump(params, f, indent=2)
 
         for fold_idx in range(args.cv):
+            fold_job_idx += 1
+            pct = 100.0 * fold_job_idx / total_fold_jobs if total_fold_jobs else 0.0
+            print(
+                f"[random_search][progress] {fold_job_idx}/{total_fold_jobs} ({pct:.1f}%) "
+                f"cfg={cfg_idx + 1}/{len(candidates)} cv={fold_idx + 1}/{args.cv}"
+            )
             fold_dir = cfg_dir / f"cv_{fold_idx:02d}"
             run_dir = fold_dir / "train_run"
             split_seed = args.seed * 1000 + fold_idx
@@ -252,6 +297,12 @@ def main() -> int:
             **params,
         }
         rows.append(row)
+        score_txt = "nan" if not math.isfinite(mean_score) else f"{mean_score:.4f}"
+        lat_txt = "nan" if not math.isfinite(mean_lat_ms) else f"{mean_lat_ms:.3f}"
+        print(
+            f"[random_search] kandidat selesai cfg={cfg_idx:04d} "
+            f"score_cv={score_txt} latency_ms_cv={lat_txt} status={status}"
+        )
         if best_row is None:
             best_row = row
         else:

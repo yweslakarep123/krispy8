@@ -36,6 +36,23 @@ def _run(cmd: List[str], cwd: pathlib.Path, env: Dict[str, str], log_path: pathl
         return proc.wait()
 
 
+def _check_gpu_or_fail(py: str, env: Dict[str, str], gpu_arg: str) -> None:
+    cmd = [
+        py,
+        "-c",
+        (
+            "import torch; "
+            "assert torch.cuda.is_available(), 'CUDA tidak tersedia'; "
+            "print(torch.cuda.device_count())"
+        ),
+    ]
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise SystemExit(f"[gpu-check] gagal: {proc.stderr.strip() or proc.stdout.strip()}")
+    out = (proc.stdout or "").strip()
+    print(f"[gpu-check] CUDA ready. visible_device_count={out} (CUDA_VISIBLE_DEVICES={gpu_arg})")
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train final dari best_trial random search")
     p.add_argument("--best-json", type=str, required=True)
@@ -43,6 +60,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--gpu", type=str, default="0")
     p.add_argument("--run-dir", type=str, required=True)
     p.add_argument("--preprocess", action="store_true")
+    p.add_argument("--scenario-name", type=str, default="scenario")
+    p.add_argument(
+        "--strict-gpu",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail jika CUDA tidak tersedia.",
+    )
     return p.parse_args()
 
 
@@ -65,6 +89,10 @@ def main() -> int:
     env["CUDA_VISIBLE_DEVICES"] = args.gpu
     env["HYDRA_FULL_ERROR"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    env["FLOWP_GPU_PERF_MODE"] = "1"
+
+    if args.strict_gpu:
+        _check_gpu_or_fail(py, env, args.gpu)
 
     cmd = [
         py,
@@ -76,7 +104,7 @@ def main() -> int:
         "training.device=cuda",
         "training.debug=False",
         "exp_name=exp_3seed_4arms",
-        format_override("logging.name", f"seed{args.seed}_{run_dir.parent.name}"),
+        format_override("logging.name", f"seed{args.seed}_{args.scenario_name}"),
         "logging.mode=offline",
         "checkpoint.save_ckpt=True",
         "training.resume=False",
@@ -87,6 +115,10 @@ def main() -> int:
         if k == "dataloader.batch_size":
             cmd.append(format_override("val_dataloader.batch_size", v))
 
+    print(
+        f"[train_best] scenario={args.scenario_name} seed={args.seed} "
+        f"preprocess={args.preprocess} run_dir={run_dir}"
+    )
     rc = _run(cmd, flowpolicy_pkg, env, run_dir.parent / "train_best_from_random.log")
     return rc
 

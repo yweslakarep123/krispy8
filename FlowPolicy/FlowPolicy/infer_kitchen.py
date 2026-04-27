@@ -63,6 +63,10 @@ def main():
         "--no-video", action="store_true",
         help="Matikan perekaman video (lebih cepat; hanya hitung SR & latency)."
     )
+    parser.add_argument(
+        "--strict-gpu", action="store_true",
+        help="Jika diset, gagal jika CUDA tidak tersedia (tidak fallback ke CPU)."
+    )
     args = parser.parse_args()
 
     ckpt_path = pathlib.Path(args.checkpoint).expanduser().resolve()
@@ -94,7 +98,15 @@ def main():
     policy = workspace.ema_model if use_ema and workspace.ema_model is not None else workspace.model
     policy.eval()
 
+    if os.environ.get("FLOWP_GPU_PERF_MODE", "0") == "1" and torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        print("[gpu-perf] enabled: cudnn.benchmark=True, tf32=True")
+
     if args.device.startswith("cuda") and not torch.cuda.is_available():
+        if args.strict_gpu:
+            raise SystemExit("CUDA tidak tersedia, strict GPU aktif. Hentikan proses.")
         device = torch.device("cpu")
         print("CUDA tidak tersedia — memakai CPU.")
     else:
