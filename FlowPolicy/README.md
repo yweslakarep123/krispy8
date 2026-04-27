@@ -272,6 +272,44 @@ bash scripts/train_best_from_halving.sh 0 \
   --run-dir data/outputs/kitchen_complete-flowpolicy_halving_best_seed42
 ```
 
+## Grid search (faktorial pada list terpendek)
+
+Skrip: `scripts/grid_search_kitchen.py` (wrapper `grid_search_kitchen.sh`). Setiap
+kombinasi HParam (lihat daftar `GRID_*` di file tersebut) diuji dengan **6** run
+train+infer: 3 seed (`0`, `42`, `101`) × 2 mode (`preprocess` off/on). Skor
+per sel = rata-rata **enam** `test_mean_score` inferensi. Hasil: `grid_trials.csv`
+(per run), `grid_summary.csv` (rata per `grid_id`), `best_trial.json` (params
+bentuk sklearn, kompatibel dengan `train_best_trial.py`).
+
+**Paralel 3 GPU (Vast.ai / multi-GPU):** beri `--gpu-pool 0,1,2` agar tiga seed
+dijalankan bersamaan (satu proses per GPU) untuk setiap tahap preprocess.
+
+```bash
+cd FlowPolicy
+# hitung jumlah sel + cek batas
+python scripts/grid_search_kitchen.py --dry-run
+# 3 GPU (koma = pool; argumen setelah pool diteruskan ke skrip Python)
+bash scripts/grid_search_kitchen.sh 0,1,2
+# 1 GPU urut
+python scripts/grid_search_kitchen.py --gpu 0
+```
+
+**Training + infer final** (contoh: tiap seed, dengan/tanpa preprocess):
+
+```bash
+# Pakai best trial grid
+python scripts/train_best_trial.py --flavor grid --seed 0
+python scripts/train_best_trial.py --flavor grid --preprocess --seed 0
+# Ulangi untuk seed 42, 101
+```
+
+**Plot ringkasan grid + metrik infer final (SR + latensi):**
+
+```bash
+python scripts/grid_results_plot_kitchen.py \
+  --final-metrics data/outputs/.../inference_.../metrics.json
+```
+
 ## Suite eksperimen 12 model (3 seed x 4 skenario)
 
 Skrip orkestrasi: `scripts/experiment_3seed_4arms.py`
