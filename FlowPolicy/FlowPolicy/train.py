@@ -54,24 +54,24 @@ warnings.filterwarnings("ignore")
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
-
-def _enable_gpu_perf_mode():
-    """Aktifkan mode performa GPU jika diminta via env."""
-    if os.environ.get("FLOWP_GPU_PERF_MODE", "0") != "1":
-        return
+# #region agent log
+def _agent_debug_log(run_id, hypothesis_id, location, message, data):
+    import json
+    payload = {
+        "sessionId": "04e3ae",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
     try:
-        import torch
-        if torch.cuda.is_available():
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-            print("[gpu-perf] enabled: cudnn.benchmark=True, tf32=True")
-    except Exception as exc:
-        print(f"[gpu-perf] warning: gagal aktifkan mode performa ({exc})")
-
-
-_enable_gpu_perf_mode()
-
+        with open("/home/daffa/Documents/krispy8/.cursor/debug-04e3ae.log", "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
@@ -136,6 +136,19 @@ class TrainFlowPolicyWorkspace:
             if lastest_ckpt_path.is_file():
                 print(f"Resuming from checkpoint {lastest_ckpt_path}")
                 self.load_checkpoint(path=lastest_ckpt_path)
+                # #region agent log
+                _agent_debug_log(
+                    run_id="step-debug",
+                    hypothesis_id="S1_S2_S3_S4",
+                    location="train.py:resume-checkpoint:after-load",
+                    message="loaded checkpoint counters",
+                    data={
+                        "checkpoint_path": str(lastest_ckpt_path),
+                        "global_step_after_load": int(self.global_step),
+                        "epoch_after_load": int(self.epoch),
+                    },
+                )
+                # #endregion
 
         # configure dataset
         dataset: BaseDataset
@@ -188,17 +201,161 @@ class TrainFlowPolicyWorkspace:
         cprint(f"[WandB] name: {cfg.logging.name}", "yellow")
         cprint("-----------------------------", "yellow")
         # configure logging
+        # #region agent log
+        _agent_debug_log(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H3_H4_H5",
+            location="train.py:wandb.init:before",
+            message="before wandb.init",
+            data={
+                "output_dir": str(self.output_dir),
+                "logging_group": str(cfg.logging.group),
+                "logging_name": str(cfg.logging.name),
+                "logging_id": str(getattr(cfg.logging, "id", None)),
+                "logging_resume": str(getattr(cfg.logging, "resume", None)),
+                "hydra_output_dir": str(HydraConfig.get().runtime.output_dir),
+            },
+        )
+        # #endregion
         wandb_run = wandb.init(
             dir=str(self.output_dir),
             config=OmegaConf.to_container(cfg, resolve=True),
             **cfg.logging
         )
-        wandb.config.update(
-            {
-                "output_dir": self.output_dir,
+        # #region agent log
+        _agent_debug_log(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H3_H4_H5",
+            location="train.py:wandb.init:after",
+            message="after wandb.init",
+            data={
+                "run_id": str(getattr(wandb_run, "id", None)),
+                "run_name": str(getattr(wandb_run, "name", None)),
+                "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                "run_dir": str(getattr(wandb_run, "dir", None)),
             },
-            allow_val_change=True,
         )
+        # #endregion
+        try:
+            existing_output_dir = wandb.config.get("output_dir", None)
+            new_output_dir = str(self.output_dir)
+            should_update_output_dir = (
+                existing_output_dir is None or str(existing_output_dir) == new_output_dir
+            )
+            # #region agent log
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="H1_H2_H3_H4_H5",
+                location="train.py:wandb.config.update:decision",
+                message="decide whether to update output_dir",
+                data={
+                    "existing_output_dir": str(existing_output_dir),
+                    "new_output_dir": new_output_dir,
+                    "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                    "should_update_output_dir": should_update_output_dir,
+                },
+            )
+            # #endregion
+            if should_update_output_dir:
+                wandb.config.update(
+                    {
+                        "output_dir": new_output_dir,
+                    }
+                )
+                # #region agent log
+                _agent_debug_log(
+                    run_id="post-fix",
+                    hypothesis_id="H1_H2_H3_H4_H5",
+                    location="train.py:wandb.config.update:applied",
+                    message="output_dir update applied",
+                    data={"output_dir": new_output_dir},
+                )
+                # #endregion
+            else:
+                # #region agent log
+                _agent_debug_log(
+                    run_id="post-fix",
+                    hypothesis_id="H1_H2_H3_H4_H5",
+                    location="train.py:wandb.config.update:skipped",
+                    message="output_dir update skipped to avoid config mutation on resumed run",
+                    data={
+                        "existing_output_dir": str(existing_output_dir),
+                        "new_output_dir": new_output_dir,
+                    },
+                )
+                # #endregion
+        except Exception as exc:
+            # #region agent log
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="H1_H2_H3_H4_H5",
+                location="train.py:wandb.config.update:exception",
+                message="wandb.config.update failed",
+                data={
+                    "exc_type": type(exc).__name__,
+                    "exc_message": str(exc),
+                    "existing_output_dir": str(wandb.config.get("output_dir", None)),
+                    "new_output_dir": str(self.output_dir),
+                },
+            )
+            # #endregion
+            raise
+        # #region agent log
+        try:
+            wandb_summary_step = wandb_run.summary.get("_step", None)
+        except Exception:
+            wandb_summary_step = None
+        _agent_debug_log(
+            run_id="step-debug",
+            hypothesis_id="S1_S2_S3_S4",
+            location="train.py:wandb-step:after-init",
+            message="wandb step state after init",
+            data={
+                "local_global_step": int(self.global_step),
+                "wandb_run_step_attr": str(getattr(wandb_run, "step", None)),
+                "wandb_summary_step": str(wandb_summary_step),
+                "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+            },
+        )
+        # #endregion
+        # #region agent log
+        wandb_step_after_init = getattr(wandb_run, "step", None)
+        if wandb_step_after_init is not None:
+            try:
+                wandb_step_after_init = int(wandb_step_after_init)
+            except Exception:
+                wandb_step_after_init = None
+        if (
+            bool(getattr(wandb_run, "resumed", False))
+            and wandb_step_after_init is not None
+            and int(self.global_step) < wandb_step_after_init
+        ):
+            prev_global_step = int(self.global_step)
+            self.global_step = wandb_step_after_init
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="S1_S2_S3_S4",
+                location="train.py:wandb-step:sync",
+                message="synced local global_step to resumed wandb step",
+                data={
+                    "prev_global_step": prev_global_step,
+                    "synced_global_step": int(self.global_step),
+                    "wandb_step_after_init": wandb_step_after_init,
+                },
+            )
+        else:
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="S1_S2_S3_S4",
+                location="train.py:wandb-step:no-sync",
+                message="no global_step sync needed",
+                data={
+                    "local_global_step": int(self.global_step),
+                    "wandb_step_after_init": str(wandb_step_after_init),
+                    "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                },
+            )
+        # #endregion
 
         # When resuming a wandb run whose server-side step is already ahead
         # of our checkpointed `self.global_step` (e.g. the previous process
@@ -294,6 +451,19 @@ class TrainFlowPolicyWorkspace:
                     is_last_batch = (batch_idx == (len(train_dataloader)-1))
                     if not is_last_batch:
                         # log of last step is combined with validation and rollout
+                        # #region agent log
+                        if batch_idx == 0 and local_epoch_idx == 0:
+                            _agent_debug_log(
+                                run_id="step-debug",
+                                hypothesis_id="S1_S2_S3_S4",
+                                location="train.py:wandb.log:first-batch",
+                                message="first batch log step values",
+                                data={
+                                    "local_global_step_before_log": int(self.global_step),
+                                    "wandb_run_step_attr_before_log": str(getattr(wandb_run, "step", None)),
+                                },
+                            )
+                        # #endregion
                         wandb_run.log(step_log, step=self.global_step)
                         self.global_step += 1
 

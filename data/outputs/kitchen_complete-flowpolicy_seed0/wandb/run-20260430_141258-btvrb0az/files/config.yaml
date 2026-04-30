@@ -1,0 +1,269 @@
+_wandb:
+    value:
+        cli_version: 0.26.1
+        e:
+            msbtbxeul1elewifbcq66u8s6cbci9jg:
+                args:
+                    - --config-name=flowpolicy
+                    - task=kitchen_complete
+                    - hydra.run.dir=data/outputs/kitchen_complete-flowpolicy_seed0
+                    - training.debug=FALSE
+                    - training.seed=0
+                    - training.device=cuda
+                    - exp_name=kitchen_complete-flowpolicy
+                    - logging.mode=online
+                    - checkpoint.save_ckpt=True
+                codePath: FlowPolicy/FlowPolicy/train.py
+                codePathLocal: FlowPolicy/FlowPolicy/train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "12.8"
+                disk:
+                    /:
+                        total: "1006450962432"
+                        used: "78444916736"
+                email: ahmaddaffaabiyyudl@gmail.com
+                executable: /home/daffa/miniforge3/envs/flowp/bin/python
+                git:
+                    commit: c78fc485707d234d1447ed96adc439495519df03
+                    remote: https://github.com/yweslakarep123/krispy8.git
+                gpu: NVIDIA GeForce RTX 3070 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 5120
+                      memoryTotal: "8589934592"
+                      name: NVIDIA GeForce RTX 3070 Laptop GPU
+                      uuid: GPU-46560031-c8a2-b0a1-76d3-c8a4779a0dc2
+                host: daffa-ZenBook-Pro-Duo-UX582LR-UX582LR
+                memory:
+                    total: "33387937792"
+                os: Linux-5.15.0-139-generic-x86_64-with-glibc2.31
+                program: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py
+                python: CPython 3.12.13
+                root: /home/daffa/Documents/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0
+                startedAt: "2026-04-30T07:12:58.194786Z"
+                writerId: msbtbxeul1elewifbcq66u8s6cbci9jg
+        m: []
+        python_version: 3.12.13
+        t:
+            "1":
+                - 1
+                - 50
+            "2":
+                - 1
+                - 50
+            "3":
+                - 5
+                - 13
+                - 15
+                - 16
+                - 61
+                - 62
+            "4": 3.12.13
+            "5": 0.26.1
+            "12": 0.26.1
+            "13": linux-x86_64
+checkpoint:
+    value:
+        save_ckpt: true
+        save_last_ckpt: true
+        save_last_snapshot: false
+        topk:
+            format_str: epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt
+            k: 1
+            mode: max
+            monitor_key: test_mean_score
+dataloader:
+    value:
+        batch_size: 128
+        num_workers: 4
+        persistent_workers: false
+        pin_memory: true
+        shuffle: true
+dataset_obs_steps:
+    value: 2
+ema:
+    value:
+        _target_: flow_policy_3d.model.flow.ema_model.EMAModel
+        inv_gamma: 1
+        max_value: 0.9999
+        min_value: 0
+        power: 0.75
+        update_after_step: 0
+exp_name:
+    value: kitchen_complete-flowpolicy
+horizon:
+    value: 8
+keypoint_visible_rate:
+    value: 1
+logging:
+    value:
+        group: kitchen_complete-flowpolicy
+        id: null
+        mode: online
+        name: kitchen_complete-flowpolicy_0
+        project: flowpolicy_kitchen
+        resume: true
+        tags:
+            - flowpolicy
+            - kitchen
+            - lowdim
+multi_run:
+    value:
+        run_dir: data/outputs/2026.04.30/14.12.57_train_flowpolicy_lowdim_kitchen_complete
+        wandb_name_base: 2026.04.30-14.12.57_train_flowpolicy_lowdim_kitchen_complete
+n_action_steps:
+    value: 4
+n_latency_steps:
+    value: 0
+n_obs_steps:
+    value: 2
+name:
+    value: train_flowpolicy_lowdim
+obs_as_global_cond:
+    value: true
+optimizer:
+    value:
+        _target_: torch.optim.AdamW
+        betas:
+            - 0.95
+            - 0.999
+        eps: 1e-08
+        lr: 0.0001
+        weight_decay: 1e-06
+output_dir:
+    value: /home/user/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0
+policy:
+    value:
+        _target_: flow_policy_3d.policy.flowpolicy_lowdim.FlowPolicyLowdim
+        Conditional_ConsistencyFM:
+            alpha: 1e-05
+            boundary: 1
+            delta: 0.01
+            eps: 0.01
+            num_inference_step: 1
+            num_segments: 2
+        action_clip: 1
+        condition_type: film
+        diffusion_step_embed_dim: 128
+        down_dims:
+            - 256
+            - 512
+            - 1024
+        encoder_output_dim: 64
+        encoder_use_layernorm: true
+        horizon: 8
+        kernel_size: 5
+        n_action_steps: 4
+        n_groups: 8
+        n_obs_steps: 2
+        obs_as_global_cond: true
+        shape_meta:
+            action:
+                shape:
+                    - 9
+            obs:
+                agent_pos:
+                    shape:
+                        - 70
+                    type: low_dim
+        state_mlp_size:
+            - 256
+            - 256
+        use_down_condition: true
+        use_mid_condition: true
+        use_up_condition: true
+shape_meta:
+    value:
+        action:
+            shape:
+                - 9
+        obs:
+            agent_pos:
+                shape:
+                    - 70
+                type: low_dim
+task:
+    value:
+        dataset:
+            _target_: flow_policy_3d.dataset.kitchen_dataset.KitchenDataset
+            action_noise_std: 0
+            dataset_id: D4RL/kitchen/complete-v2
+            download: true
+            enforce_task_order: true
+            horizon: 8
+            max_train_episodes: null
+            normalizer_mode: limits
+            obs_noise_std: 0.01
+            pad_after: 3
+            pad_before: 1
+            seed: 42
+            tasks_to_complete:
+                - microwave
+                - kettle
+                - light switch
+                - slide cabinet
+            val_ratio: 0.02
+        env_runner:
+            _target_: flow_policy_3d.env_runner.kitchen_runner.KitchenRunner
+            eval_episodes: 20
+            fps: 10
+            max_steps: 280
+            max_video_episodes: 2
+            n_action_steps: 4
+            n_obs_steps: 2
+            record_video: true
+            save_videos_dir: null
+            task_name: kitchen_complete
+            tasks_to_complete:
+                - microwave
+                - kettle
+                - light switch
+                - slide cabinet
+            wandb_log: true
+        name: kitchen_complete
+        shape_meta:
+            action:
+                shape:
+                    - 9
+            obs:
+                agent_pos:
+                    shape:
+                        - 70
+                    type: low_dim
+        task_name: kitchen_complete
+        tasks_to_complete:
+            - microwave
+            - kettle
+            - light switch
+            - slide cabinet
+task_name:
+    value: kitchen_complete
+training:
+    value:
+        checkpoint_every: 200
+        debug: false
+        device: cuda
+        ema_decay: 0.95
+        gradient_accumulate_every: 1
+        lr_scheduler: cosine
+        lr_warmup_steps: 500
+        max_grad_norm: 1
+        max_train_steps: null
+        max_val_steps: null
+        num_epochs: 3000
+        resume: true
+        rollout_every: 200
+        sample_every: 5
+        seed: 0
+        tqdm_interval_sec: 1
+        use_ema: true
+        val_every: 1
+val_dataloader:
+    value:
+        batch_size: 128
+        num_workers: 4
+        persistent_workers: false
+        pin_memory: true
+        shuffle: false

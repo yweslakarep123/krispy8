@@ -46,9 +46,9 @@ task:
 name: train_flowpolicy_lowdim
 task_name: ${task.name}
 shape_meta: ${task.shape_meta}
-exp_name: kitchen_complete-flowpolicy
-n_obs_steps: 2
-n_action_steps: 4
+exp_name: random_search
+n_obs_steps: 6
+n_action_steps: 2
 horizon: ${eval:'4 * ((max(${n_obs_steps} + ${n_action_steps} - 1, 4) + 3) // 4)'}
 n_latency_steps: 0
 dataset_obs_steps: ${n_obs_steps}
@@ -79,12 +79,12 @@ policy:
   encoder_use_layernorm: true
   action_clip: 1.0
   Conditional_ConsistencyFM:
-    eps: 0.01
-    num_segments: 2
-    boundary: 1
-    delta: 0.01
-    alpha: 1.0e-05
-    num_inference_step: 1
+    eps: 0.0001
+    num_segments: 1
+    boundary: 0.5
+    delta: 1
+    alpha: 1.0e-06
+    num_inference_step: 2
 ema:
   _target_: flow_policy_3d.model.flow.ema_model.EMAModel
   update_after_step: 0
@@ -93,20 +93,20 @@ ema:
   min_value: 0.0
   max_value: 0.9999
 dataloader:
-  batch_size: 128
+  batch_size: 256
   num_workers: 4
   shuffle: true
   pin_memory: true
   persistent_workers: false
 val_dataloader:
-  batch_size: 128
+  batch_size: 256
   num_workers: 4
   shuffle: false
   pin_memory: true
   persistent_workers: false
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 0.0001
+  lr: 1.0e-05
   betas:
   - 0.95
   - 0.999
@@ -114,12 +114,12 @@ optimizer:
   weight_decay: 1.0e-06
 training:
   device: cuda
-  seed: 0
+  seed: 3
   debug: false
   resume: true
   lr_scheduler: cosine
   lr_warmup_steps: 500
-  num_epochs: 3000
+  num_epochs: 500
   gradient_accumulate_every: 1
   use_ema: true
   rollout_every: 200
@@ -134,8 +134,8 @@ training:
 logging:
   group: ${exp_name}
   id: null
-  mode: online
-  name: ${exp_name}_${training.seed}
+  mode: offline
+  name: random_search_cfg_00_seed3
   project: flowpolicy_kitchen
   resume: true
   tags:

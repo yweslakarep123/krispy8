@@ -1,0 +1,45 @@
+Error executing job with overrides: ['task=kitchen_complete', 'training.debug=FALSE', 'training.seed=0', 'training.device=cuda', 'exp_name=kitchen_complete-flowpolicy', 'logging.mode=online', 'checkpoint.save_ckpt=True']
+[34m[1mwandb[0m: [32m[41mERROR[0m Attempted to change value of key "output_dir" from /home/user/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0 to /home/daffa/Documents/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0
+[34m[1mwandb[0m: [32m[41mERROR[0m If you really want to do this, pass allow_val_change=True to config.update()
+Traceback (most recent call last):
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 607, in <module>
+    main()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 223, in run_and_report
+    raise ex
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+        ^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 604, in main
+    workspace.run()
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 255, in run
+    wandb.config.update(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 188, in update
+    sanitized = self._update(d, allow_val_change)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 181, in _update
+    sanitized = self._sanitize_dict(
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 268, in _sanitize_dict
+    k, v = self._sanitize(k, v, allow_val_change)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/wandb/sdk/wandb_config.py", line 292, in _sanitize
+    raise config_util.ConfigError(
+wandb.sdk.lib.config_util.ConfigError: Attempted to change value of key "output_dir" from /home/user/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0 to /home/daffa/Documents/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0
+If you really want to do this, pass allow_val_change=True to config.update()
