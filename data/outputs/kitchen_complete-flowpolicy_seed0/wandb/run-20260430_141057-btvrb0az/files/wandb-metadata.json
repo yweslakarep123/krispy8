@@ -1,0 +1,28 @@
+{
+  "os":  "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "python":  "CPython 3.12.13",
+  "startedAt":  "2026-04-30T07:10:57.931361Z",
+  "args":  [
+    "--config-name=flowpolicy",
+    "task=kitchen_complete",
+    "hydra.run.dir=data/outputs/kitchen_complete-flowpolicy_seed0",
+    "training.debug=FALSE",
+    "training.seed=0",
+    "training.device=cuda",
+    "exp_name=kitchen_complete-flowpolicy",
+    "logging.mode=online",
+    "checkpoint.save_ckpt=True"
+  ],
+  "program":  "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py",
+  "codePath":  "FlowPolicy/FlowPolicy/train.py",
+  "codePathLocal":  "FlowPolicy/FlowPolicy/train.py",
+  "git":  {
+    "remote":  "https://github.com/yweslakarep123/krispy8.git",
+    "commit":  "c78fc485707d234d1447ed96adc439495519df03"
+  },
+  "email":  "ahmaddaffaabiyyudl@gmail.com",
+  "root":  "/home/daffa/Documents/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0",
+  "host":  "daffa-ZenBook-Pro-Duo-UX582LR-UX582LR",
+  "executable":  "/home/daffa/miniforge3/envs/flowp/bin/python",
+  "writerId":  "xz1i6or2kac3uciz4h20s9g7isqe2380"
+}

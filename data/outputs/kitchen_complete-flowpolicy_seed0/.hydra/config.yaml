@@ -26,6 +26,8 @@ task:
     tasks_to_complete: ${task.tasks_to_complete}
     record_video: true
     max_video_episodes: 2
+    save_videos_dir: null
+    wandb_log: true
   dataset:
     _target_: flow_policy_3d.dataset.kitchen_dataset.KitchenDataset
     dataset_id: D4RL/kitchen/complete-v2
@@ -36,13 +38,18 @@ task:
     val_ratio: 0.02
     max_train_episodes: null
     download: true
+    tasks_to_complete: ${task.tasks_to_complete}
+    enforce_task_order: true
+    obs_noise_std: 0.01
+    action_noise_std: 0.0
+    normalizer_mode: limits
 name: train_flowpolicy_lowdim
 task_name: ${task.name}
 shape_meta: ${task.shape_meta}
 exp_name: kitchen_complete-flowpolicy
-horizon: 4
 n_obs_steps: 2
 n_action_steps: 4
+horizon: ${eval:'4 * ((max(${n_obs_steps} + ${n_action_steps} - 1, 4) + 3) // 4)'}
 n_latency_steps: 0
 dataset_obs_steps: ${n_obs_steps}
 keypoint_visible_rate: 1.0
@@ -71,6 +78,13 @@ policy:
   - 256
   encoder_use_layernorm: true
   action_clip: 1.0
+  Conditional_ConsistencyFM:
+    eps: 0.01
+    num_segments: 2
+    boundary: 1
+    delta: 0.01
+    alpha: 1.0e-05
+    num_inference_step: 1
 ema:
   _target_: flow_policy_3d.model.flow.ema_model.EMAModel
   update_after_step: 0

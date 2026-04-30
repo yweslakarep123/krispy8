@@ -1,0 +1,49 @@
+# cmd: /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_00_seed4 training.seed=4 training.device=cuda training.debug=False exp_name=random_search logging.name=random_search_cfg_00_seed4 logging.mode=offline checkpoint.save_ckpt=True training.num_epochs=500 optimizer.lr=1e-05 dataloader.batch_size=256 val_dataloader.batch_size=256 training.lr_warmup_steps=500 training.ema_decay=0.95 policy.obs_encoder.output_dim=64 policy.Conditional_ConsistencyFM.num_segments=1 policy.Conditional_ConsistencyFM.boundary=0.5 policy.Conditional_ConsistencyFM.delta=1 policy.Conditional_ConsistencyFM.alpha=1e-06 policy.Conditional_ConsistencyFM.eps=0.0001 n_action_steps=2 n_obs_steps=6 policy.Conditional_ConsistencyFM.sampling_eps=0.001 policy.Conditional_ConsistencyFM.noise_scale=0 policy.Conditional_ConsistencyFM.sigma_var=0.05 policy.Conditional_ConsistencyFM.num_inference_steps=5
+Traceback (most recent call last):
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 108, in <module>
+    import torch
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/__init__.py", line 2604, in <module>
+    from torch import _meta_registrations
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_meta_registrations.py", line 11, in <module>
+    from torch._decomp import (
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_decomp/__init__.py", line 284, in <module>
+    import torch._decomp.decompositions
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_decomp/decompositions.py", line 15, in <module>
+    import torch._prims as prims
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_prims/__init__.py", line 524, in <module>
+    abs = _make_elementwise_unary_prim(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_prims/__init__.py", line 492, in _make_elementwise_unary_prim
+    return _make_prim(
+           ^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_prims/__init__.py", line 320, in _make_prim
+    prim_def = torch.library.custom_op(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_library/custom_ops.py", line 145, in custom_op
+    return inner(fn)
+           ^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_library/custom_ops.py", line 126, in inner
+    result = CustomOpDef(namespace, opname, schema_str, fn)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_library/custom_ops.py", line 174, in __init__
+    self._register_to_dispatcher()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_library/custom_ops.py", line 594, in _register_to_dispatcher
+    lib._register_fake(self._name, fake_impl, _stacklevel=4)
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/library.py", line 177, in _register_fake
+    source = torch._library.utils.get_source(_stacklevel + 1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_library/utils.py", line 53, in get_source
+    frame = inspect.getframeinfo(sys._getframe(stacklevel))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/inspect.py", line 1718, in getframeinfo
+    lines, lnum = findsource(frame)
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/inspect.py", line 1090, in findsource
+    module = getmodule(object, file)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/inspect.py", line 1016, in getmodule
+    os.path.realpath(f)] = module.__name__
+    ^^^^^^^^^^^^^^^^^^^
+  File "<frozen posixpath>", line 424, in realpath
+  File "<frozen posixpath>", line 468, in _joinrealpath
+KeyboardInterrupt

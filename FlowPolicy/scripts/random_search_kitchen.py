@@ -31,23 +31,88 @@ import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 
-SEARCH_SPACE: Dict[str, List[Any]] = {
-    # Training
+# =============================================================================
+# Hyperparameter search spaces — dipisah sesuai Table S1 di supplementary.
+#
+# TRAIN_SEARCH_SPACE  : parameter yang memengaruhi proses training (epoch,
+#                       optimiser, arsitektur, CFM training knobs).
+# SAMPLE_SEARCH_SPACE : parameter yang HANYA digunakan saat sampling /
+#                       inferensi (eps_s, noise_scale, sigma_var,
+#                       num_inference_steps).
+#
+# SEARCH_SPACE        : gabungan keduanya — dipakai oleh sisa kode.
+# =============================================================================
+
+TRAIN_SEARCH_SPACE: Dict[str, List[Any]] = {
+    # ── General training ──────────────────────────────────────────────────────
+    # paper default → 3000
     "training.num_epochs":                           [500, 1000, 3000, 5000],
-    "optimizer.lr":                                  [1e-3, 1e-4, 1e-5, 5e-4],
+    # paper default → 1e-4
+    "optimizer.lr":                                  [1e-5, 1e-4, 5e-4, 1e-3],
+    # paper default → 128
     "dataloader.batch_size":                         [64, 128, 256, 512],
-    # Consistency flow-matching (policy)
+    # paper default → 500
+    "training.lr_warmup_steps":                      [200, 500, 1000, 2000],
+    # paper default → 0.95
+    "training.ema_decay":                            [0.90, 0.95, 0.99, 0.999],
+
+    # ── Encoder ───────────────────────────────────────────────────────────────
+    # paper default → 64
+    "policy.encoder_output_dim":                     [32, 64, 128, 256],
+
+    # ── Consistency FM — training knobs (Table S1 "Training" block) ───────────
+    # paper default → 2
     "policy.Conditional_ConsistencyFM.num_segments": [1, 2, 3, 4],
-    "policy.Conditional_ConsistencyFM.eps":          [1e-2, 1e-3, 1e-4, 1.0],
-    "policy.Conditional_ConsistencyFM.delta":        [1e-2, 1e-3, 1e-4, 1.0],
-    # Horizon-related (horizon akan otomatis disesuaikan oleh yaml)
+    # boundary (b) — upper limit of flow interval — paper default → 1
+    "policy.Conditional_ConsistencyFM.boundary":     [0.5, 1.0, 2.0, 4.0],
+    # delta — lower bound of training interval — paper default → 1e-2
+    "policy.Conditional_ConsistencyFM.delta":        [1e-3, 1e-2, 1e-1, 1.0],
+    # alpha — loss weighting term — paper default → 1e-5
+    "policy.Conditional_ConsistencyFM.alpha":        [1e-6, 1e-5, 1e-4, 1e-3],
+    # eps (training) — noise floor during training — paper default → 1e-2
+    "policy.Conditional_ConsistencyFM.eps":          [1e-4, 1e-3, 1e-2, 1e-1],
+
+    # ── Horizon-related (horizon akan otomatis disesuaikan oleh yaml) ─────────
     "n_action_steps":                                [2, 4, 6, 8],
     "n_obs_steps":                                   [4, 6, 8, 16],
+}
+
+SAMPLE_SEARCH_SPACE: Dict[str, List[Any]] = {
+    # ── Consistency FM — sampling knobs (Table S1 "Sampling" block) ───────────
+    # num_inference_steps — jumlah langkah denoising — paper default → 1
+    "policy.Conditional_ConsistencyFM.num_inference_step": [1, 2, 3, 5],
+}
+
+# Gabungan — digunakan oleh sisa kode tanpa perubahan.
+SEARCH_SPACE: Dict[str, List[Any]] = {
+    **TRAIN_SEARCH_SPACE,
+    **SAMPLE_SEARCH_SPACE,
 }
 
 DEFAULT_SEEDS: List[int] = [0, 42, 101]
 DEFAULT_N_CONFIGS: int = 30
 DEFAULT_EVAL_EPISODES: int = 50
+
+
+# #region agent log
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str,
+                     message: str, data: Dict[str, Any]) -> None:
+    payload = {
+        "sessionId": "04e3ae",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open("/home/daffa/Documents/krispy8/.cursor/debug-04e3ae.log",
+                  "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 
 def sample_configs(n: int, sampling_seed: int) -> List[Dict[str, Any]]:
@@ -89,6 +154,26 @@ def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
         # batch_size juga disamakan untuk val_dataloader
         if k == "dataloader.batch_size":
             overrides.append(format_override("val_dataloader.batch_size", v))
+
+    # #region agent log
+    _agent_debug_log(
+        run_id="pre-fix",
+        hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
+        location="random_search_kitchen.py:build_train_cmd",
+        message="built train command overrides",
+        data={
+            "seed": seed,
+            "run_dir": str(run_dir),
+            "has_policy_obs_encoder_output_dim": "policy.obs_encoder.output_dim" in cfg,
+            "has_sampling_eps": "policy.Conditional_ConsistencyFM.sampling_eps" in cfg,
+            "has_num_inference_steps_plural": "policy.Conditional_ConsistencyFM.num_inference_steps" in cfg,
+                "has_num_inference_step_singular": "policy.Conditional_ConsistencyFM.num_inference_step" in cfg,
+                "has_noise_scale": "policy.Conditional_ConsistencyFM.noise_scale" in cfg,
+                "has_sigma_var": "policy.Conditional_ConsistencyFM.sigma_var" in cfg,
+            "override_count": len(overrides),
+        },
+    )
+    # #endregion
 
     return [sys.executable, "train.py", *overrides]
 
@@ -240,6 +325,8 @@ def main() -> int:
                         help="Jangan tulis summary.csv di akhir")
     parser.add_argument("--only-cfg", type=int, nargs="+", default=None,
                         help="Hanya jalankan cfg_idx ini (untuk debugging)")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="Lanjut ke run berikutnya saat ada training/inferensi gagal")
     args = parser.parse_args()
 
     script_dir = pathlib.Path(__file__).resolve().parent
@@ -287,6 +374,20 @@ def main() -> int:
                   f"({total_runs}) ==========")
             print(f"  cfg      : {cfg}")
             print(f"  run_dir  : {run_dir}")
+            # #region agent log
+            _agent_debug_log(
+                run_id="pre-fix",
+                hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
+                location="random_search_kitchen.py:main:run-start",
+                message="starting cfg-seed run",
+                data={
+                    "cfg_idx": i,
+                    "seed": seed,
+                    "run_dir": str(run_dir),
+                    "config_keys": sorted(list(cfg.keys())),
+                },
+            )
+            # #endregion
 
             # Resume: metrics.json sudah ada & valid -> skip
             if mpath.is_file():
@@ -312,11 +413,31 @@ def main() -> int:
                 rc = run_subprocess(
                     train_cmd, run_dir / "train_stdout.log", env=env)
                 if rc != 0 or not ckpt_path.is_file():
+                    # #region agent log
+                    _agent_debug_log(
+                        run_id="pre-fix",
+                        hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
+                        location="random_search_kitchen.py:main:train-failed",
+                        message="training failed and inference skipped",
+                        data={
+                            "cfg_idx": i,
+                            "seed": seed,
+                            "return_code": rc,
+                            "ckpt_exists": ckpt_path.is_file(),
+                            "train_log_path": str(run_dir / "train_stdout.log"),
+                        },
+                    )
+                    # #endregion
                     print(f"  [ERROR] training gagal (rc={rc}), skip inferensi.")
                     _append_run_row(results_csv, i, seed, cfg, {},
                                     status=f"train_failed_rc{rc}",
                                     t_train=time.time() - t0)
-                    continue
+                    if args.continue_on_error:
+                        continue
+                    print("  [STOP] Fail-fast aktif: run dihentikan karena training gagal.")
+                    if not args.skip_summary:
+                        write_summary(results_csv, summary_csv, configs)
+                    return 1
             t_train = time.time() - t0
 
             # --- inference (50 ep) ---
@@ -340,6 +461,11 @@ def main() -> int:
             _append_run_row(results_csv, i, seed, cfg, metrics,
                             status="ok" if metrics else f"infer_failed_rc{rc}",
                             t_train=t_train, t_infer=t_infer)
+            if not metrics and not args.continue_on_error:
+                print("  [STOP] Fail-fast aktif: run dihentikan karena inferensi gagal.")
+                if not args.skip_summary:
+                    write_summary(results_csv, summary_csv, configs)
+                return 1
 
     # Summary
     if not args.skip_summary:

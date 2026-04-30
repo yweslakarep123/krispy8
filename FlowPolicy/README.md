@@ -200,20 +200,29 @@ python infer_kitchen.py \
 
 ## Random search hyperparameter (alternatif)
 
-Skrip `scripts/random_search_kitchen.py` melakukan random search pada 8
-hyperparameter, 30 konfigurasi acak × 3 seed `[0, 42, 101]`, dengan
-evaluasi akhir 50 episode per run.
+Skrip `scripts/random_search_kitchen.py` melakukan random search yang
+**sekaligus men-train model** untuk setiap kombinasi `(cfg_idx, seed)`,
+kemudian langsung inferensi/evaluasi.
+
+Default: 30 konfigurasi acak × 3 seed `[0, 42, 101]`, evaluasi 50 episode
+per run.
 
 Ruang sampling:
 
 | hyperparameter                                   | nilai                                |
 |--------------------------------------------------|--------------------------------------|
 | `training.num_epochs`                            | `[500, 1000, 3000, 5000]`            |
-| `optimizer.lr`                                   | `[1e-3, 5e-4, 1e-4, 1e-5]`           |
+| `optimizer.lr`                                   | `[1e-5, 1e-4, 5e-4, 1e-3]`           |
 | `dataloader.batch_size`                          | `[64, 128, 256, 512]`                |
+| `training.lr_warmup_steps`                       | `[200, 500, 1000, 2000]`             |
+| `training.ema_decay`                             | `[0.90, 0.95, 0.99, 0.999]`          |
+| `policy.encoder_output_dim`                      | `[32, 64, 128, 256]`                 |
 | `policy.Conditional_ConsistencyFM.num_segments`  | `[1, 2, 3, 4]`                       |
-| `policy.Conditional_ConsistencyFM.eps`           | `[1e-2, 1e-3, 1e-4, 1.0]`            |
-| `policy.Conditional_ConsistencyFM.delta`         | `[1e-2, 1e-3, 1e-4, 1.0]`            |
+| `policy.Conditional_ConsistencyFM.boundary`      | `[0.5, 1.0, 2.0, 4.0]`               |
+| `policy.Conditional_ConsistencyFM.delta`         | `[1e-3, 1e-2, 1e-1, 1.0]`            |
+| `policy.Conditional_ConsistencyFM.alpha`         | `[1e-6, 1e-5, 1e-4, 1e-3]`           |
+| `policy.Conditional_ConsistencyFM.eps`           | `[1e-4, 1e-3, 1e-2, 1e-1]`           |
+| `policy.Conditional_ConsistencyFM.num_inference_step` | `[1, 2, 3, 5]`                 |
 | `n_action_steps`                                 | `[2, 4, 6, 8]`                       |
 | `n_obs_steps`                                    | `[4, 6, 8, 16]`                      |
 
@@ -230,6 +239,18 @@ bash scripts/random_search_kitchen.sh 0 --dry-run
 bash scripts/random_search_kitchen.sh 0
 ```
 
+Contoh 100 iterasi:
+
+```bash
+cd FlowPolicy
+python scripts/random_search_kitchen.py \
+  --n-configs 100 \
+  --seeds 0 42 101 \
+  --episodes 50 \
+  --sampling-seed 42 \
+  --gpu 0
+```
+
 Keluaran di `data/outputs/random_search/`:
 
 - `configs.json` — daftar 30 konfigurasi yang di-sample (stabil selama
@@ -244,6 +265,25 @@ Keluaran di `data/outputs/random_search/`:
 
 Resume otomatis: jika `metrics.json` untuk `(cfg_idx, seed)` tertentu
 sudah valid, skrip melewatinya.
+
+### Alur setelah tuning
+
+Tidak perlu retrain terpisah jika checkpoint dari random search sudah ada dan
+valid. Langkah yang disarankan:
+
+1. Pilih `cfg_idx` terbaik dari `summary.csv` (baris teratas, karena sudah
+   diurutkan berdasarkan `test_mean_score_mean`).
+2. Langsung inferensi checkpoint terbaik untuk seed yang diinginkan.
+
+Contoh inferensi dari hasil random search (mis. `cfg_17_seed0`):
+
+```bash
+cd FlowPolicy/FlowPolicy
+python infer_kitchen.py \
+  --checkpoint data/outputs/random_search/cfg_17_seed0/checkpoints/latest.ckpt \
+  --episodes 50 \
+  --device cuda:0
+```
 
 ## Inferensi (checkpoint → video + metrik)
 
