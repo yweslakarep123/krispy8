@@ -117,7 +117,11 @@ logging:
   - lowdim
 
 checkpoint:
-  save_ckpt: False
+  # True supaya training manual (`python train.py ...`) otomatis menyimpan
+  # checkpoint di <run_dir>/checkpoints/latest.ckpt. Tanpa ini, `eval.py` dan
+  # `infer_kitchen.py` tidak punya checkpoint untuk dimuat dan normalizer
+  # model akan kosong (error: "ParameterDict has no attribute 'agent_pos'").
+  save_ckpt: True
   topk:
     monitor_key: test_mean_score
     mode: max

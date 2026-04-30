@@ -49,10 +49,30 @@ dataset:
   # keempat task dalam urutan ini.
   tasks_to_complete: ${task.tasks_to_complete}
   enforce_task_order: true
-  # Augmentasi data (hanya diterapkan di split training, bukan validasi):
+  # Augmentasi data (hanya diterapkan di split training, bukan validasi/test):
   #   obs_noise_std  -> Gaussian noise di 59 dim observation (robot-state)
   #   action_noise_std -> Gaussian noise pada target action
   # Boleh di-override via command line Hydra saat sweep.
   obs_noise_std: 0.01
   action_noise_std: 0.0
   normalizer_mode: limits
+  # Preprocessing sliding-window opsional.
+  # Alur saat enabled=true:
+  #   1) setiap demonstrasi panjang T dipotong menjadi window berukuran
+  #      round(window_ratio * T) dengan stride `stride` (stride=1 = setiap
+  #      timestep jadi awal window baru). Window-window ini jadi "episode"
+  #      baru di replay buffer.
+  #   2) semua window di-shuffle (split_seed) lalu dibagi
+  #      train_ratio / val_ratio / test_ratio (default 70/20/10).
+  #   3) noise augmentation (obs_noise_std / action_noise_std) hanya
+  #      diterapkan di split training.
+  # enabled=false = pipeline lama (satu episode = satu trajectory, split
+  # pakai `val_ratio` saja, tidak ada test split).
+  preprocess:
+    enabled: false
+    window_ratio: 0.25
+    stride: 1
+    train_ratio: 0.70
+    val_ratio: 0.20
+    test_ratio: 0.10
+    split_seed: 42

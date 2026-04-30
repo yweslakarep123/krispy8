@@ -1,0 +1,7 @@
+{"time":"2026-04-23T17:02:29.559830005+07:00","level":"INFO","msg":"wandb-core"}
+{"time":"2026-04-23T17:02:29.56081926+07:00","level":"INFO","msg":"stream: starting","core version":"0.26.0"}
+{"time":"2026-04-23T17:02:31.937705946+07:00","level":"INFO","msg":"stream: created new stream","id":"f5c1dfol"}
+{"time":"2026-04-23T17:02:31.937845812+07:00","level":"INFO","msg":"handler: started"}
+{"time":"2026-04-23T17:02:31.938061209+07:00","level":"INFO","msg":"stream: started"}
+{"time":"2026-04-23T17:02:31.938336304+07:00","level":"INFO","msg":"sender: started"}
+{"time":"2026-04-23T17:02:31.93835546+07:00","level":"INFO","msg":"writer: started","stream_id":"f5c1dfol"}

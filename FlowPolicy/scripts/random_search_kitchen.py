@@ -1,501 +1,345 @@
 #!/usr/bin/env python3
-"""Random search untuk FlowPolicy di FrankaKitchen-v1.
+"""Random search hyperparameter untuk FlowPolicy kitchen.
 
-Melakukan:
-1. Sampling N konfigurasi acak dari ruang hyperparameter yang ditentukan.
-2. Untuk setiap konfigurasi x seed, jalankan `train.py` (via subprocess
-   Hydra) lalu `infer_kitchen.py` (50 episode) terhadap checkpoint final.
-3. Agregasi hasil ke `results.csv` (per run) dan `summary.csv` (mean ± std
-   per konfigurasi di 3 seed), diurutkan berdasarkan mean success rate.
-
-Resume: jika `metrics.json` valid sudah ada untuk sebuah
-`(cfg_idx, seed)`, skrip melewatinya.
-
-Contoh:
-  cd FlowPolicy
-  python scripts/random_search_kitchen.py --gpu 0
-  python scripts/random_search_kitchen.py --gpu 0 --dry-run
+Alur:
+1) Sample n_iter kandidat hyperparameter.
+2) Untuk tiap kandidat, jalankan training + inferensi per fold (cv).
+3) Skor kandidat = rerata test_mean_score lintas fold.
+4) Simpan results.csv dan best_trial.json.
 """
-
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import math
 import os
 import pathlib
 import random
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List
 
 
-# =============================================================================
-# Hyperparameter search spaces — dipisah sesuai Table S1 di supplementary.
-#
-# TRAIN_SEARCH_SPACE  : parameter yang memengaruhi proses training (epoch,
-#                       optimiser, arsitektur, CFM training knobs).
-# SAMPLE_SEARCH_SPACE : parameter yang HANYA digunakan saat sampling /
-#                       inferensi (eps_s, noise_scale, sigma_var,
-#                       num_inference_steps).
-#
-# SEARCH_SPACE        : gabungan keduanya — dipakai oleh sisa kode.
-# =============================================================================
-
-TRAIN_SEARCH_SPACE: Dict[str, List[Any]] = {
-    # ── General training ──────────────────────────────────────────────────────
-    # paper default → 3000
-    "training.num_epochs":                           [500, 1000, 3000, 5000],
-    # paper default → 1e-4
-    "optimizer.lr":                                  [1e-5, 1e-4, 5e-4, 1e-3],
-    # paper default → 128
-    "dataloader.batch_size":                         [64, 128, 256, 512],
-    # paper default → 500
-    "training.lr_warmup_steps":                      [200, 500, 1000, 2000],
-    # paper default → 0.95
-    "training.ema_decay":                            [0.90, 0.95, 0.99, 0.999],
-
-    # ── Encoder ───────────────────────────────────────────────────────────────
-    # paper default → 64
-    "policy.encoder_output_dim":                     [32, 64, 128, 256],
-
-    # ── Consistency FM — training knobs (Table S1 "Training" block) ───────────
-    # paper default → 2
-    "policy.Conditional_ConsistencyFM.num_segments": [1, 2, 3, 4],
-    # boundary (b) — upper limit of flow interval — paper default → 1
-    "policy.Conditional_ConsistencyFM.boundary":     [0.5, 1.0, 2.0, 4.0],
-    # delta — lower bound of training interval — paper default → 1e-2
-    "policy.Conditional_ConsistencyFM.delta":        [1e-3, 1e-2, 1e-1, 1.0],
-    # alpha — loss weighting term — paper default → 1e-5
-    "policy.Conditional_ConsistencyFM.alpha":        [1e-6, 1e-5, 1e-4, 1e-3],
-    # eps (training) — noise floor during training — paper default → 1e-2
-    "policy.Conditional_ConsistencyFM.eps":          [1e-4, 1e-3, 1e-2, 1e-1],
-
-    # ── Horizon-related (horizon akan otomatis disesuaikan oleh yaml) ─────────
-    "n_action_steps":                                [2, 4, 6, 8],
-    "n_obs_steps":                                   [4, 6, 8, 16],
-}
-
-SAMPLE_SEARCH_SPACE: Dict[str, List[Any]] = {
-    # ── Consistency FM — sampling knobs (Table S1 "Sampling" block) ───────────
-    # num_inference_steps — jumlah langkah denoising — paper default → 1
-    "policy.Conditional_ConsistencyFM.num_inference_step": [1, 2, 3, 5],
-}
-
-# Gabungan — digunakan oleh sisa kode tanpa perubahan.
-SEARCH_SPACE: Dict[str, List[Any]] = {
-    **TRAIN_SEARCH_SPACE,
-    **SAMPLE_SEARCH_SPACE,
-}
-
-DEFAULT_SEEDS: List[int] = [0, 42, 101]
-DEFAULT_N_CONFIGS: int = 30
-DEFAULT_EVAL_EPISODES: int = 50
-
-
-# #region agent log
-def _agent_debug_log(run_id: str, hypothesis_id: str, location: str,
-                     message: str, data: Dict[str, Any]) -> None:
-    payload = {
-        "sessionId": "04e3ae",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with open("/home/daffa/Documents/krispy8/.cursor/debug-04e3ae.log",
-                  "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-# #endregion
-
-
-def sample_configs(n: int, sampling_seed: int) -> List[Dict[str, Any]]:
-    """Sample `n` hyperparameter dicts independently & uniformly per key."""
-    rng = random.Random(sampling_seed)
-    configs: List[Dict[str, Any]] = []
-    for _ in range(n):
-        cfg = {k: rng.choice(v) for k, v in SEARCH_SPACE.items()}
-        configs.append(cfg)
-    return configs
+def _fmt_value(v: Any) -> str:
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, float):
+        return f"{v:.6g}"
+    if isinstance(v, list):
+        return "[" + ",".join(_fmt_value(x) for x in v) + "]"
+    return str(v)
 
 
 def format_override(key: str, value: Any) -> str:
-    """Format single Hydra override. Floats sebaiknya dikirim dalam notasi
-    scientific agar Hydra tidak salah parse integer-like float (mis. 1.0)."""
-    if isinstance(value, bool):
-        return f"{key}={str(value).lower()}"
-    if isinstance(value, float):
-        return f"{key}={value:.6g}"
-    return f"{key}={value}"
+    return f"{key}={_fmt_value(value)}"
 
 
-def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
-                    save_ckpt: bool = True) -> List[str]:
-    overrides = [
+def _run(cmd: List[str], cwd: pathlib.Path, env: Dict[str, str], log_path: pathlib.Path, dry_run: bool) -> int:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    if dry_run:
+        line = f"{stamp} | DRY-RUN | {' '.join(cmd)}\n"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(line)
+        print(line.strip())
+        return 0
+
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"{stamp} | CMD | {' '.join(cmd)}\n")
+        f.flush()
+        proc = subprocess.Popen(cmd, cwd=str(cwd), stdout=f, stderr=subprocess.STDOUT, env=env)
+        return proc.wait()
+
+
+def _read_metrics(metrics_path: pathlib.Path) -> Dict[str, Any]:
+    with open(metrics_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _check_gpu_or_fail(py: str, env: Dict[str, str], gpu_arg: str, dry_run: bool) -> None:
+    if dry_run:
+        print(f"[gpu-check] skip (dry-run), target GPU={gpu_arg}")
+        return
+    cmd = [
+        py,
+        "-c",
+        (
+            "import torch; "
+            "assert torch.cuda.is_available(), 'CUDA tidak tersedia'; "
+            "print(torch.cuda.device_count())"
+        ),
+    ]
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise SystemExit(f"[gpu-check] gagal: {proc.stderr.strip() or proc.stdout.strip()}")
+    out = (proc.stdout or "").strip()
+    print(f"[gpu-check] CUDA ready. visible_device_count={out} (CUDA_VISIBLE_DEVICES={gpu_arg})")
+
+
+def _sample_candidates(rng: random.Random, n_iter: int) -> List[Dict[str, Any]]:
+    space = {
+        "training.num_epochs": [300, 500, 800, 1000],
+        "optimizer.lr": [3e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3],
+        "dataloader.batch_size": [64, 128, 256],
+        "policy.Conditional_ConsistencyFM.num_segments": [2, 4, 8, 16],
+        "policy.Conditional_ConsistencyFM.eps": [1e-4, 5e-4, 1e-3, 1e-2],
+        "policy.Conditional_ConsistencyFM.delta": [1e-4, 5e-4, 1e-3, 1e-2],
+        "n_action_steps": [2, 4, 6, 8],
+        "n_obs_steps": [2, 4, 6, 8, 12, 16],
+    }
+    candidates: List[Dict[str, Any]] = []
+    seen = set()
+    max_trials = max(n_iter * 20, 1000)
+    attempts = 0
+    while len(candidates) < n_iter and attempts < max_trials:
+        attempts += 1
+        cand = {k: rng.choice(vs) for k, vs in space.items()}
+        key = tuple(sorted(cand.items()))
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(cand)
+    return candidates
+
+
+def _build_train_cmd(
+    py: str,
+    run_dir: pathlib.Path,
+    seed: int,
+    preprocess: bool,
+    params: Dict[str, Any],
+    logging_name: str,
+    split_seed: int,
+) -> List[str]:
+    cmd = [
+        py,
+        "train.py",
         "--config-name=flowpolicy",
         "task=kitchen_complete",
-        f"hydra.run.dir={run_dir}",
-        f"training.seed={seed}",
+        format_override("hydra.run.dir", str(run_dir)),
+        format_override("training.seed", seed),
         "training.device=cuda",
         "training.debug=False",
         "exp_name=random_search",
-        f"logging.name=random_search_{run_dir.name}",
+        format_override("logging.name", logging_name),
         "logging.mode=offline",
-        f"checkpoint.save_ckpt={'True' if save_ckpt else 'False'}",
+        "checkpoint.save_ckpt=True",
+        "training.resume=False",
+        format_override("task.dataset.preprocess.enabled", preprocess),
+        format_override("task.dataset.preprocess.split_seed", split_seed),
     ]
-    for k, v in cfg.items():
-        overrides.append(format_override(k, v))
-        # batch_size juga disamakan untuk val_dataloader
+    for k, v in params.items():
+        cmd.append(format_override(k, v))
         if k == "dataloader.batch_size":
-            overrides.append(format_override("val_dataloader.batch_size", v))
-
-    # #region agent log
-    _agent_debug_log(
-        run_id="pre-fix",
-        hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
-        location="random_search_kitchen.py:build_train_cmd",
-        message="built train command overrides",
-        data={
-            "seed": seed,
-            "run_dir": str(run_dir),
-            "has_policy_obs_encoder_output_dim": "policy.obs_encoder.output_dim" in cfg,
-            "has_sampling_eps": "policy.Conditional_ConsistencyFM.sampling_eps" in cfg,
-            "has_num_inference_steps_plural": "policy.Conditional_ConsistencyFM.num_inference_steps" in cfg,
-                "has_num_inference_step_singular": "policy.Conditional_ConsistencyFM.num_inference_step" in cfg,
-                "has_noise_scale": "policy.Conditional_ConsistencyFM.noise_scale" in cfg,
-                "has_sigma_var": "policy.Conditional_ConsistencyFM.sigma_var" in cfg,
-            "override_count": len(overrides),
-        },
-    )
-    # #endregion
-
-    return [sys.executable, "train.py", *overrides]
+            cmd.append(format_override("val_dataloader.batch_size", v))
+    return cmd
 
 
-def build_infer_cmd(ckpt_path: pathlib.Path, episodes: int,
-                    output_subdir: str) -> List[str]:
+def _build_infer_cmd(py: str, ckpt: pathlib.Path, episodes: int, out_subdir: str) -> List[str]:
     return [
-        sys.executable, "infer_kitchen.py",
-        "--checkpoint", str(ckpt_path),
-        "--episodes", str(episodes),
-        "--device", "cuda:0",
-        "--output-subdir", output_subdir,
+        py,
+        "infer_kitchen.py",
+        "--checkpoint",
+        str(ckpt),
+        "--episodes",
+        str(episodes),
+        "--device",
+        "cuda:0",
+        "--output-subdir",
+        out_subdir,
+        "--no-video",
     ]
 
 
-def metrics_path_for(run_dir: pathlib.Path, output_subdir: str) -> pathlib.Path:
-    return run_dir / output_subdir / "metrics.json"
-
-
-def read_metrics(path: pathlib.Path) -> Dict[str, float]:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data
-
-
-def append_result_row(results_csv: pathlib.Path, row: Dict[str, Any]) -> None:
-    write_header = not results_csv.exists()
-    # Use explicit fieldnames so resumed runs keep the original column order.
-    fieldnames = list(row.keys())
-    with open(results_csv, "a", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
-
-
-def load_existing_results(results_csv: pathlib.Path) -> List[Dict[str, str]]:
-    if not results_csv.exists():
-        return []
-    with open(results_csv, "r", encoding="utf-8", newline="") as f:
-        return list(csv.DictReader(f))
-
-
-def write_summary(results_csv: pathlib.Path, summary_csv: pathlib.Path,
-                  configs: List[Dict[str, Any]]) -> None:
-    rows = load_existing_results(results_csv)
-    if not rows:
-        print("[summary] results.csv kosong, summary dilewati.")
-        return
-
-    # group by cfg_idx
-    grouped: Dict[int, List[Dict[str, str]]] = {}
-    for r in rows:
-        try:
-            cid = int(r["cfg_idx"])
-        except Exception:
-            continue
-        grouped.setdefault(cid, []).append(r)
-
-    param_keys = list(SEARCH_SPACE.keys())
-    metric_keys = ["test_mean_score", "mean_n_completed_tasks", "mean_time"]
-
-    summary_rows: List[Dict[str, Any]] = []
-    for cid, runs in grouped.items():
-        if not runs:
-            continue
-        summary_row: Dict[str, Any] = {"cfg_idx": cid, "n_seeds": len(runs)}
-        # hyperparameters (ambil dari konfigurasi yang di-sample, bukan csv,
-        # agar tipe tetap numeric)
-        if cid < len(configs):
-            for k in param_keys:
-                summary_row[k] = configs[cid][k]
-        # metrics: mean + std
-        for mk in metric_keys:
-            vals: List[float] = []
-            for r in runs:
-                try:
-                    vals.append(float(r.get(mk, "nan")))
-                except Exception:
-                    pass
-            if vals:
-                arr_mean = sum(vals) / len(vals)
-                arr_std = (sum((x - arr_mean) ** 2 for x in vals) / len(vals)) ** 0.5
-                summary_row[f"{mk}_mean"] = arr_mean
-                summary_row[f"{mk}_std"] = arr_std
-            else:
-                summary_row[f"{mk}_mean"] = float("nan")
-                summary_row[f"{mk}_std"] = float("nan")
-        summary_rows.append(summary_row)
-
-    summary_rows.sort(
-        key=lambda r: r.get("test_mean_score_mean", float("-inf")),
-        reverse=True,
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Random search FlowPolicy kitchen")
+    p.add_argument("--seed", type=int, required=True, help="Seed utama random search.")
+    p.add_argument("--out-root", type=str, required=True)
+    p.add_argument("--gpu", type=str, default="0")
+    p.add_argument("--n-iter", type=int, default=100)
+    p.add_argument("--cv", type=int, default=5)
+    p.add_argument("--eval-episodes", type=int, default=20)
+    p.add_argument("--random-state", type=int, default=0)
+    p.add_argument("--preprocess", action="store_true")
+    p.add_argument("--scenario-name", type=str, default="scenario")
+    p.add_argument(
+        "--strict-gpu",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail jika CUDA tidak tersedia.",
     )
-
-    if not summary_rows:
-        return
-
-    fieldnames = list(summary_rows[0].keys())
-    for r in summary_rows:
-        for k in r.keys():
-            if k not in fieldnames:
-                fieldnames.append(k)
-
-    with open(summary_csv, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in summary_rows:
-            writer.writerow(r)
-    print(f"[summary] {summary_csv}  ({len(summary_rows)} konfigurasi)")
-    print(f"[summary] Top-3 (mean test_mean_score):")
-    for r in summary_rows[:3]:
-        print(f"  cfg {r['cfg_idx']}: "
-              f"SR={r.get('test_mean_score_mean'):.4f} ± "
-              f"{r.get('test_mean_score_std'):.4f}  ({r.get('n_seeds')} seeds)")
-
-
-def run_subprocess(cmd: Sequence[str], log_path: pathlib.Path,
-                   env: Dict[str, str]) -> int:
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(log_path, "w", encoding="utf-8") as logf:
-        logf.write(f"# cmd: {' '.join(cmd)}\n")
-        logf.flush()
-        proc = subprocess.Popen(
-            cmd, stdout=logf, stderr=subprocess.STDOUT, env=env)
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            proc.terminate()
-            raise
-    return proc.returncode
+    p.add_argument("--dry-run", action="store_true")
+    return p.parse_args()
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Random search FlowPolicy kitchen")
-    parser.add_argument("--n-configs", type=int, default=DEFAULT_N_CONFIGS)
-    parser.add_argument("--seeds", type=int, nargs="+", default=DEFAULT_SEEDS)
-    parser.add_argument("--episodes", type=int, default=DEFAULT_EVAL_EPISODES,
-                        help="Jumlah episode inferensi per run")
-    parser.add_argument("--out-root", type=str,
-                        default="data/outputs/random_search")
-    parser.add_argument("--sampling-seed", type=int, default=42,
-                        help="Seed RNG untuk memilih kombinasi hyperparameter")
-    parser.add_argument("--gpu", type=str, default="0",
-                        help="CUDA_VISIBLE_DEVICES")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Cetak daftar konfigurasi tanpa menjalankan training")
-    parser.add_argument("--skip-summary", action="store_true",
-                        help="Jangan tulis summary.csv di akhir")
-    parser.add_argument("--only-cfg", type=int, nargs="+", default=None,
-                        help="Hanya jalankan cfg_idx ini (untuk debugging)")
-    parser.add_argument("--continue-on-error", action="store_true",
-                        help="Lanjut ke run berikutnya saat ada training/inferensi gagal")
-    args = parser.parse_args()
-
-    script_dir = pathlib.Path(__file__).resolve().parent
-    flowpolicy_dir = script_dir.parent / "FlowPolicy"
-    assert flowpolicy_dir.is_dir(), \
-        f"Tidak menemukan folder FlowPolicy/FlowPolicy di {flowpolicy_dir}"
-
-    out_root = (flowpolicy_dir / args.out_root).resolve()
+    args = parse_args()
+    here = pathlib.Path(__file__).resolve().parent
+    flowpolicy_pkg = here.parent / "FlowPolicy"
+    out_root = pathlib.Path(args.out_root).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
-    results_csv = out_root / "results.csv"
-    summary_csv = out_root / "summary.csv"
-    configs_json = out_root / "configs.json"
 
-    configs = sample_configs(args.n_configs, args.sampling_seed)
-
-    # Simpan daftar konfigurasi (stabil antar run bila --sampling-seed tetap).
-    with open(configs_json, "w", encoding="utf-8") as f:
-        json.dump(configs, f, indent=2)
-    print(f"[search] {len(configs)} konfigurasi ditulis ke {configs_json}")
-
-    if args.dry_run:
-        print("[dry-run] daftar konfigurasi:")
-        for i, cfg in enumerate(configs):
-            if args.only_cfg and i not in args.only_cfg:
-                continue
-            print(f"  cfg {i:02d}: {cfg}")
-        return 0
-
+    py = sys.executable
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = args.gpu
     env["HYDRA_FULL_ERROR"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
+    env["FLOWP_GPU_PERF_MODE"] = "1"
 
-    total_runs = 0
-    for i, cfg in enumerate(configs):
-        if args.only_cfg and i not in args.only_cfg:
-            continue
-        for seed in args.seeds:
-            total_runs += 1
-            run_dir = (out_root / f"cfg_{i:02d}_seed{seed}").resolve()
-            run_dir.mkdir(parents=True, exist_ok=True)
-            infer_subdir = f"inference_ep{args.episodes}"
-            mpath = metrics_path_for(run_dir, infer_subdir)
+    if args.strict_gpu:
+        _check_gpu_or_fail(py, env, args.gpu, args.dry_run)
 
-            print(f"\n========== [cfg {i:02d} / seed {seed}] "
-                  f"({total_runs}) ==========")
-            print(f"  cfg      : {cfg}")
-            print(f"  run_dir  : {run_dir}")
-            # #region agent log
-            _agent_debug_log(
-                run_id="pre-fix",
-                hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
-                location="random_search_kitchen.py:main:run-start",
-                message="starting cfg-seed run",
-                data={
-                    "cfg_idx": i,
-                    "seed": seed,
-                    "run_dir": str(run_dir),
-                    "config_keys": sorted(list(cfg.keys())),
-                },
+    rng = random.Random(args.random_state + args.seed * 10007 + (1 if args.preprocess else 0))
+    candidates = _sample_candidates(rng, args.n_iter)
+    if not candidates:
+        raise SystemExit("Tidak ada kandidat random search yang berhasil dibangkitkan.")
+
+    rows: List[Dict[str, Any]] = []
+    best_row: Dict[str, Any] | None = None
+
+    total_fold_jobs = len(candidates) * args.cv
+    fold_job_idx = 0
+    print(
+        f"[random_search] start scenario={args.scenario_name} seed={args.seed} "
+        f"n_iter={len(candidates)} cv={args.cv} preprocess={args.preprocess}"
+    )
+
+    for cfg_idx, params in enumerate(candidates):
+        print(f"[random_search] kandidat {cfg_idx + 1}/{len(candidates)}")
+        fold_scores: List[float] = []
+        fold_latencies: List[float] = []
+        status = "ok"
+        t_cfg_start = time.time()
+        cfg_dir = out_root / f"cfg_{cfg_idx:04d}_seed{args.seed}"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        params_json = cfg_dir / "params.json"
+        with open(params_json, "w", encoding="utf-8") as f:
+            json.dump(params, f, indent=2)
+
+        for fold_idx in range(args.cv):
+            fold_job_idx += 1
+            pct = 100.0 * fold_job_idx / total_fold_jobs if total_fold_jobs else 0.0
+            print(
+                f"[random_search][progress] {fold_job_idx}/{total_fold_jobs} ({pct:.1f}%) "
+                f"cfg={cfg_idx + 1}/{len(candidates)} cv={fold_idx + 1}/{args.cv}"
             )
-            # #endregion
+            fold_dir = cfg_dir / f"cv_{fold_idx:02d}"
+            run_dir = fold_dir / "train_run"
+            split_seed = args.seed * 1000 + fold_idx
+            train_seed = args.seed * 100 + fold_idx
+            log_name = f"random_cfg{cfg_idx:04d}_seed{args.seed}_cv{fold_idx:02d}"
+            rc_train = _run(
+                _build_train_cmd(
+                    py=py,
+                    run_dir=run_dir,
+                    seed=train_seed,
+                    preprocess=args.preprocess,
+                    params=params,
+                    logging_name=log_name,
+                    split_seed=split_seed,
+                ),
+                cwd=flowpolicy_pkg,
+                env=env,
+                log_path=fold_dir / "train.log",
+                dry_run=args.dry_run,
+            )
+            if rc_train != 0:
+                status = f"train_fail_cv{fold_idx}"
+                break
 
-            # Resume: metrics.json sudah ada & valid -> skip
-            if mpath.is_file():
-                try:
-                    metrics = read_metrics(mpath)
-                    if "test_mean_score" in metrics:
-                        print(f"  [skip] metrics sudah ada: "
-                              f"SR={metrics['test_mean_score']:.4f}")
-                        _append_run_row(results_csv, i, seed, cfg, metrics,
-                                        status="skip_resume")
-                        continue
-                except Exception:
-                    pass
+            ckpt = run_dir / "checkpoints" / "latest.ckpt"
+            if not args.dry_run and not ckpt.is_file():
+                status = f"missing_ckpt_cv{fold_idx}"
+                break
 
-            # --- training ---
-            t0 = time.time()
-            ckpt_path = run_dir / "checkpoints" / "latest.ckpt"
-            if ckpt_path.is_file():
-                print(f"  [skip-train] checkpoint sudah ada: {ckpt_path}")
-            else:
-                train_cmd = build_train_cmd(cfg, seed, run_dir, save_ckpt=True)
-                print(f"  [train] {' '.join(train_cmd)}")
-                rc = run_subprocess(
-                    train_cmd, run_dir / "train_stdout.log", env=env)
-                if rc != 0 or not ckpt_path.is_file():
-                    # #region agent log
-                    _agent_debug_log(
-                        run_id="pre-fix",
-                        hypothesis_id="RS_H1_RS_H2_RS_H3_RS_H4_RS_H5",
-                        location="random_search_kitchen.py:main:train-failed",
-                        message="training failed and inference skipped",
-                        data={
-                            "cfg_idx": i,
-                            "seed": seed,
-                            "return_code": rc,
-                            "ckpt_exists": ckpt_path.is_file(),
-                            "train_log_path": str(run_dir / "train_stdout.log"),
-                        },
-                    )
-                    # #endregion
-                    print(f"  [ERROR] training gagal (rc={rc}), skip inferensi.")
-                    _append_run_row(results_csv, i, seed, cfg, {},
-                                    status=f"train_failed_rc{rc}",
-                                    t_train=time.time() - t0)
-                    if args.continue_on_error:
-                        continue
-                    print("  [STOP] Fail-fast aktif: run dihentikan karena training gagal.")
-                    if not args.skip_summary:
-                        write_summary(results_csv, summary_csv, configs)
-                    return 1
-            t_train = time.time() - t0
+            rc_inf = _run(
+                _build_infer_cmd(py=py, ckpt=ckpt, episodes=args.eval_episodes, out_subdir="inference_cv_eval"),
+                cwd=flowpolicy_pkg,
+                env=env,
+                log_path=fold_dir / "infer.log",
+                dry_run=args.dry_run,
+            )
+            if rc_inf != 0:
+                status = f"infer_fail_cv{fold_idx}"
+                break
 
-            # --- inference (50 ep) ---
-            t1 = time.time()
-            infer_cmd = build_infer_cmd(
-                ckpt_path, episodes=args.episodes, output_subdir=infer_subdir)
-            print(f"  [infer] {' '.join(infer_cmd)}")
-            rc = run_subprocess(
-                infer_cmd, run_dir / "infer_stdout.log", env=env)
-            t_infer = time.time() - t1
+            metrics_path = run_dir / "inference_cv_eval" / "metrics.json"
+            if not args.dry_run and metrics_path.is_file():
+                metrics = _read_metrics(metrics_path)
+                score = float(metrics.get("test_mean_score", float("nan")))
+                lat_ms = float(metrics.get("mean_time", float("nan"))) * 1000.0
+                if math.isfinite(score):
+                    fold_scores.append(score)
+                if math.isfinite(lat_ms):
+                    fold_latencies.append(lat_ms)
 
-            metrics: Dict[str, float] = {}
-            if rc == 0 and mpath.is_file():
-                try:
-                    metrics = read_metrics(mpath)
-                except Exception as exc:
-                    print(f"  [WARN] gagal parse metrics: {exc}")
-            else:
-                print(f"  [ERROR] inferensi gagal (rc={rc})")
+        mean_score = float("nan")
+        mean_lat_ms = float("nan")
+        if fold_scores:
+            mean_score = sum(fold_scores) / len(fold_scores)
+        if fold_latencies:
+            mean_lat_ms = sum(fold_latencies) / len(fold_latencies)
+        if len(fold_scores) < args.cv and not args.dry_run and status == "ok":
+            status = "partial_cv"
 
-            _append_run_row(results_csv, i, seed, cfg, metrics,
-                            status="ok" if metrics else f"infer_failed_rc{rc}",
-                            t_train=t_train, t_infer=t_infer)
-            if not metrics and not args.continue_on_error:
-                print("  [STOP] Fail-fast aktif: run dihentikan karena inferensi gagal.")
-                if not args.skip_summary:
-                    write_summary(results_csv, summary_csv, configs)
-                return 1
+        row: Dict[str, Any] = {
+            "cfg_idx": cfg_idx,
+            "seed": args.seed,
+            "cv": args.cv,
+            "folds_ok": len(fold_scores),
+            "preprocess": args.preprocess,
+            "mean_test_mean_score_cv": mean_score,
+            "mean_latency_ms_cv": mean_lat_ms,
+            "status": status,
+            "t_total_s": time.time() - t_cfg_start,
+            **params,
+        }
+        rows.append(row)
+        score_txt = "nan" if not math.isfinite(mean_score) else f"{mean_score:.4f}"
+        lat_txt = "nan" if not math.isfinite(mean_lat_ms) else f"{mean_lat_ms:.3f}"
+        print(
+            f"[random_search] kandidat selesai cfg={cfg_idx:04d} "
+            f"score_cv={score_txt} latency_ms_cv={lat_txt} status={status}"
+        )
+        if best_row is None:
+            best_row = row
+        else:
+            old = float(best_row.get("mean_test_mean_score_cv", float("nan")))
+            new = float(row.get("mean_test_mean_score_cv", float("nan")))
+            if (not math.isfinite(old) and math.isfinite(new)) or (math.isfinite(new) and new > old):
+                best_row = row
 
-    # Summary
-    if not args.skip_summary:
-        write_summary(results_csv, summary_csv, configs)
-    print("[done] Selesai.")
+    results_csv = out_root / "results.csv"
+    keys = sorted({k for r in rows for k in r.keys()})
+    with open(results_csv, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+    if best_row is None:
+        raise SystemExit("Random search tidak menghasilkan kandidat valid.")
+
+    best_trial = {
+        "cfg_idx": int(best_row["cfg_idx"]),
+        "seed": int(args.seed),
+        "preprocess": bool(args.preprocess),
+        "cv": int(args.cv),
+        "score_key": "mean_test_mean_score_cv",
+        "best_score": float(best_row.get("mean_test_mean_score_cv", float("nan"))),
+        "best_latency_ms_cv": float(best_row.get("mean_latency_ms_cv", float("nan"))),
+        "params": {k: v for k, v in best_row.items() if k in candidates[0]},
+        "results_csv": str(results_csv),
+    }
+    with open(out_root / "best_trial.json", "w", encoding="utf-8") as f:
+        json.dump(best_trial, f, indent=2)
+
+    print(f"[random_search] results -> {results_csv}")
+    print(f"[random_search] best -> {out_root / 'best_trial.json'}")
     return 0
 
 
-def _append_run_row(results_csv: pathlib.Path, cfg_idx: int, seed: int,
-                    cfg: Dict[str, Any], metrics: Dict[str, float],
-                    status: str,
-                    t_train: float = 0.0, t_infer: float = 0.0) -> None:
-    row: Dict[str, Any] = {"cfg_idx": cfg_idx, "seed": seed}
-    for k in SEARCH_SPACE.keys():
-        row[k] = cfg.get(k)
-    for mk in ("test_mean_score", "mean_n_completed_tasks", "mean_time",
-               "mean_success_rates", "SR_test_L3", "SR_test_L5"):
-        v = metrics.get(mk)
-        row[mk] = float(v) if v is not None else ""
-    row["status"] = status
-    row["t_train_s"] = round(t_train, 2)
-    row["t_infer_s"] = round(t_infer, 2)
-    row["timestamp"] = int(time.time())
-    append_result_row(results_csv, row)
-
-
 if __name__ == "__main__":
-    # Pindah ke folder FlowPolicy/FlowPolicy agar train.py & infer_kitchen.py
-    # menemukan path config & cwd yang konsisten.
-    _here = pathlib.Path(__file__).resolve().parent
-    _flowpolicy_pkg = _here.parent / "FlowPolicy"
-    os.chdir(_flowpolicy_pkg)
     sys.exit(main())

@@ -1,0 +1,1 @@
+2026-04-26 20:50:57 | DRY-RUN | /home/daffa/miniforge3/bin/python3 infer_kitchen.py --checkpoint /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/exp_3seed_4arms/seed0/baseline_pre/train_run/checkpoints/latest.ckpt --episodes 5 --device cuda:0 --output-subdir inference_suite_eval --no-video

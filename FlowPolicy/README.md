@@ -1,124 +1,101 @@
-# FlowPolicy (low-dim) for Franka Kitchen
+# FlowPolicy Kitchen - Cara Menjalankan Eksperimen
 
-Low-dim state-based adaptation of [FlowPolicy (AAAI 2025)](https://arxiv.org/abs/2412.04987)
-for the **FrankaKitchen-v1** environment (`gymnasium-robotics`), trained with
-behaviour cloning on the Minari `D4RL/kitchen/complete-v2` dataset.
+Dokumen ini menjelaskan cara menjalankan eksperimen `3 seed x 2 scenario` dengan alur:
+- random search hyperparameter (`n_iter`, `cv`)
+- train final model terbaik per scenario
+- inferensi evaluasi
+- inferensi final untuk global winner
+- generate plot performa
 
-The consistency flow-matching formulation and `ConditionalUnet1D` backbone of
-the original repo are kept unchanged. All 3D point-cloud / PointNet /
-Metaworld / Adroit code paths, along with the `mujoco-py`, `pytorch3d`,
-`open3d`, and old-`gym` dependencies, have been removed.
+Scenario yang dijalankan per seed:
+- `tuned_no_preprocess`
+- `tuned_preprocess`
 
-## Observation / action
+## 1) Jalankan dari root repository
 
-The policy input is a single low-dim vector per timestep:
+Pastikan perintah dijalankan dari:
+- `C:/Users/Thinkpad/Downloads/krispy8`
 
-```
-agent_pos_t = concat(obs_dict['observation'],
-                     flatten(obs_dict['desired_goal']))
-```
+## 2) Command utama (sesuai skenario Anda)
 
-with the `desired_goal` dict flattened in **alphabetical key order** so the
-same layout is used during training (Minari) and rollout (`gymnasium`).
-
-For `tasks_to_complete = [microwave, kettle, light switch, slide cabinet]`:
-
-| piece              | dim |
-|--------------------|-----|
-| `observation`      |  59 |
-| `desired_goal`     |  11 (kettle 7 + light switch 2 + microwave 1 + slide cabinet 1) |
-| **agent_pos**      |  **70** |
-| action             |   9 (Box[-1, 1]) |
-
-## Installation
-
-See [install.md](install.md).
-
-## Training
+Menjalankan eksperimen penuh dengan:
+- seed: `0 42 101`
+- random search: `n_iter=100`
+- cross-validation: `cv=5`
+- simpan video final global winner
+- strict GPU aktif default (akan gagal jika CUDA tidak tersedia)
 
 ```bash
-bash scripts/train_kitchen.sh 0 0        # seed 0, GPU 0
+py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 42 101 --random-n-iter 100 --random-cv 5 --hero-video
 ```
 
-Under the hood this runs:
+Jika ingin mengizinkan fallback CPU (tidak disarankan):
 
 ```bash
-python FlowPolicy/train.py --config-name=flowpolicy task=kitchen_complete ...
+py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 42 101 --random-n-iter 100 --random-cv 5 --hero-video --no-strict-gpu
 ```
 
-Logs are pushed to Weights & Biases (project `flowpolicy_kitchen`).
+## 3) Opsi cepat untuk pengecekan alur (dry-run)
 
-## Evaluation
+Tidak menjalankan training/inferensi sungguhan, hanya validasi urutan command:
 
 ```bash
-bash scripts/eval_kitchen.sh 0 0
+py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 --random-n-iter 2 --random-cv 2 --eval-episodes 2 --hero-episodes 2 --dry-run
 ```
 
-The evaluation runner instantiates FrankaKitchen-v1 via `gymnasium.make`,
-computes the fraction of `tasks_to_complete` completed per episode (averaged
-over `eval_episodes`), and (optionally) logs a few rollout videos.
+## 4) Arti output yang dihasilkan
 
-## Urutan sub-task & filter demonstrasi
+Default output ada di:
+- `FlowPolicy/FlowPolicy/data/outputs/exp_3seed_4arms`
 
-Task yaml (`FlowPolicy/flow_policy_3d/config/task/kitchen_complete.yaml`)
-mendefinisikan `tasks_to_complete` dengan urutan:
+File penting:
+- `all_models_eval.csv`: hasil evaluasi semua scenario/model lintas seed
+- `seed_winners.json`: pemenang per seed
+- `global_winner.json`: model terbaik global
+- `final_summary.json`: ringkasan inferensi final global winner
+- `plot_summary.json`: ringkasan path file plot
 
-```
-[microwave, kettle, light switch, slide cabinet]
-```
+Plot yang dibuat:
+- `plots/success_rate_all_models.png`
+- `plots/global_winner_sr_latency.png`
 
-Urutan ini dipakai di dua tempat:
+## 5) Script yang dipakai di balik orkestrasi
 
-1. **Layout vektor goal** pada `agent_pos`. `KitchenDataset` dan
-   `KitchenRunner` sama-sama memakai urutan ini (bukan alfabetis seperti
-   versi sebelumnya) agar komposisi `agent_pos_t` di training dan rollout
-   konsisten.
-2. **Filter demonstrasi**. Hanya episode yang menyelesaikan keempat task
-   persis dalam urutan di atas yang dipakai untuk training. Set
-   `dataset.enforce_task_order=false` untuk menonaktifkan.
+- `FlowPolicy/scripts/random_search_kitchen.py`
+  - random search per seed/mode preprocess
+  - output utama: `results.csv` dan `best_trial.json`
+- `FlowPolicy/scripts/train_best_from_random.py`
+  - training model final dari `best_trial.json`
+- `FlowPolicy/scripts/experiment_3seed_4arms.py`
+  - orkestrasi end-to-end + plotting
+  - menampilkan progress `[progress] ...` saat run
 
-## Augmentasi data (generalisasi)
+## 6) Monitoring progress saat run
 
-Untuk mencegah model menghafal trajektori, tersedia dua augmentasi (hanya
-diterapkan pada split training):
+Saat eksperimen berjalan, terminal menampilkan progres seperti:
+- `[progress] 3/22 (13.6%) - seed0 scenario=tuned_no_preprocess train_best`
+- `[random_search][progress] 12/500 (2.4%) cfg=3/100 cv=2/5`
 
-| yaml field                   | default | keterangan                                   |
-|------------------------------|---------|----------------------------------------------|
-| `dataset.obs_noise_std`      | `0.01`  | Gaussian noise di 59 dim observation state   |
-| `dataset.action_noise_std`   | `0.0`   | Gaussian noise pada target action            |
-| `dataset.normalizer_mode`    | `limits`| `limits` atau `gaussian`                     |
+Artinya:
+- progress orkestrasi global (seed/scenario/eval/final)
+- progress detail random search (kandidat dan fold CV yang sedang diproses)
 
-Override via Hydra, mis. `dataset.obs_noise_std=0.02`.
+## 7) GPU mode dan verifikasi
 
-## OFAT hyperparameter sweep (8 HP x 4 nilai x 3 seed = 96 run)
+Script sekarang memaksa mode GPU dan optimasi performa:
+- set `training.device=cuda`
+- `strict GPU`: stop jika CUDA tidak tersedia
+- `FLOWP_GPU_PERF_MODE=1` mengaktifkan:
+  - `torch.backends.cudnn.benchmark=True`
+  - `torch.backends.cuda.matmul.allow_tf32=True`
+  - `torch.backends.cudnn.allow_tf32=True`
 
-Skrip `scripts/ofat_search_kitchen.py` meng-eksplorasi **setiap** hyperparameter
-satu per satu (One-Factor-At-a-Time), menahan yang lain di nilai baseline.
-
-Baseline:
-
-| hyperparameter                                  | baseline |
-|-------------------------------------------------|----------|
-| `training.num_epochs`                           | 3000     |
-| `optimizer.lr`                                  | 1e-4     |
-| `dataloader.batch_size`                         | 128      |
-| `policy.Conditional_ConsistencyFM.num_segments` | 2        |
-| `policy.Conditional_ConsistencyFM.eps`          | 1e-2     |
-| `policy.Conditional_ConsistencyFM.delta`        | 1e-2     |
-| `n_action_steps`                                | 4        |
-| `n_obs_steps`                                   | 4        |
-
-Untuk tiap hyperparameter, 4 nilai dari ruang sampling dijalankan (total 32
-konfigurasi), tiap konfigurasi di 3 seed `[0, 42, 101]`, evaluasi 50 episode.
-
-Menjalankan:
+Verifikasi saat run:
+- akan muncul log `[gpu-check] CUDA ready ...`
+- monitor utilitas GPU dengan:
 
 ```bash
-cd FlowPolicy
-bash scripts/ofat_search_kitchen.sh 0 --dry-run          # cek 32 konfigurasi
-bash scripts/ofat_search_kitchen.sh 0                    # full sweep di GPU 0
-bash scripts/ofat_search_kitchen.sh 0 --only-hp optimizer.lr   # hanya sweep lr
-bash scripts/ofat_search_kitchen.sh 0 --max-minutes 600   # stop setelah 10 jam (Colab T4)
+nvidia-smi -l 1
 ```
 
 Keluaran di `data/outputs/ofat_search/`:
@@ -359,3 +336,5 @@ and `Consistency_FM`. If you use this code, please cite the original paper:
 ## License
 
 MIT (see [LICENSE](LICENSE)).
+
+Catatan: penggunaan GPU tidak selalu 100% setiap detik karena bisa dibatasi pipeline environment/data loading, tetapi konfigurasi ini memastikan eksekusi utama berjalan di CUDA dan di-tune untuk throughput.
