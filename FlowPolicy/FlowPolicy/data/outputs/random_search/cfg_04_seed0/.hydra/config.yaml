@@ -47,7 +47,7 @@ name: train_flowpolicy_lowdim
 task_name: ${task.name}
 shape_meta: ${task.shape_meta}
 exp_name: random_search
-n_obs_steps: 4
+n_obs_steps: 8
 n_action_steps: 8
 horizon: ${eval:'4 * ((max(${n_obs_steps} + ${n_action_steps} - 1, 4) + 3) // 4)'}
 n_latency_steps: 0
@@ -60,7 +60,7 @@ policy:
   use_down_condition: true
   use_mid_condition: true
   use_up_condition: true
-  diffusion_step_embed_dim: 128
+  diffusion_step_embed_dim: 1024
   down_dims:
   - 256
   - 512
@@ -74,15 +74,15 @@ policy:
   obs_as_global_cond: true
   shape_meta: ${shape_meta}
   state_mlp_size:
-  - 256
-  - 256
+  - 512
+  - 512
   encoder_use_layernorm: true
   action_clip: 1.0
   Conditional_ConsistencyFM:
-    eps: 1
+    eps: 0.001
     num_segments: 1
     boundary: 1
-    delta: 0.01
+    delta: 0.0001
     alpha: 1.0e-05
     num_inference_step: 1
 ema:
@@ -106,7 +106,7 @@ val_dataloader:
   persistent_workers: false
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 1.0e-05
+  lr: 0.0005
   betas:
   - 0.95
   - 0.999
@@ -119,7 +119,7 @@ training:
   resume: true
   lr_scheduler: cosine
   lr_warmup_steps: 500
-  num_epochs: 3000
+  num_epochs: 500
   gradient_accumulate_every: 1
   use_ema: true
   rollout_every: 200

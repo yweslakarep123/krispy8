@@ -4,7 +4,10 @@
 # Contoh:
 #   bash scripts/random_search_kitchen.sh 0            # GPU 0, default 30 cfg
 #   bash scripts/random_search_kitchen.sh 0 --dry-run  # cek konfigurasi saja
-#
+#   bash scripts/random_search_kitchen.sh 0 --sort-by trade_off
+#   bash scripts/random_search_kitchen.sh 0 --n-configs 5
+#   bash scripts/random_search_kitchen.sh 0 --preprocessing-profile minimal \
+#       --out-root data/outputs/random_search_minimal
 set -euo pipefail
 
 gpu_id=${1:-0}

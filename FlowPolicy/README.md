@@ -37,8 +37,14 @@ See [install.md](install.md).
 ## Training
 
 ```bash
-bash scripts/train_kitchen.sh 0 0        # seed 0, GPU 0
+bash scripts/train_kitchen.sh 0 0        # seed 0, GPU 0 (profil default: standard)
 ```
+
+Setiap kali skrip dijalankan, keluaran ditulis ke folder **baru** (tidak menimpa run lama), dengan pola:
+
+`FlowPolicy/data/outputs/kitchen_complete-flowpolicy_seed<N>_<profil>__<YYYYMMDD_HHMMSS>_<random>/`
+
+Di terminal akan tercetak waktu mulai (ISO), hostname, GPU, `run_slug`, dan `output_dir`. Training memakai `training.resume=false` dan run WandB tidak dilanjutkan (`logging.resume=false` + id unik).
 
 Under the hood this runs:
 
@@ -47,6 +53,37 @@ python FlowPolicy/train.py --config-name=flowpolicy task=kitchen_complete ...
 ```
 
 Logs are pushed to Weights & Biases (project `flowpolicy_kitchen`).
+
+## Urutan workflow (train dulu, lalu eksperimen)
+
+Urutan yang Anda maksud — dari **tanpa preprocessing** (`raw`) ke **dengan preprocessing** (`standard`). Ganti `0` di akhir perintah pertama bila GPU bukan 0. Semua perintah dari folder **`FlowPolicy`**.
+
+1. **Training kitchen, tanpa preprocessing** (`raw` — stride horizon, tanpa noise, tanpa holdout val acak bila tanpa indeks CV):
+
+```bash
+cd FlowPolicy
+bash scripts/train_kitchen.sh 0 0 FALSE True raw
+```
+
+2. **Training kitchen, dengan preprocessing** (`standard` — sliding + augmentasi default):
+
+```bash
+bash scripts/train_kitchen.sh 0 0 FALSE True standard
+```
+
+3. **Eksperimen CV (orkestrator), tanpa preprocessing** — hanya profil `raw`; keluaran terpisah agar mudah dibandingkan:
+
+```bash
+bash scripts/run_experiment.sh 0 --profiles raw --output-dir data/outputs/experiment_raw
+```
+
+4. **Eksperimen CV, dengan preprocessing** — hanya profil `standard`:
+
+```bash
+bash scripts/run_experiment.sh 0 --profiles standard --output-dir data/outputs/experiment_standard
+```
+
+**Catatan:** `train_kitchen` setiap kali membuat folder output **baru** (timestamp di nama folder). `run_experiment` memakai `--output-dir` berbeda di langkah 3 vs 4 supaya `results.csv` / `runs/` tidak tercampur; jika memakai `--output-dir` yang sama, tetap aman karena nama sel berbeda (`..._raw_...` vs `..._standard_...`), tetapi dua file ringkasan terpisah biasanya lebih rapi.
 
 ## Evaluation
 
@@ -88,7 +125,19 @@ diterapkan pada split training):
 | `dataset.action_noise_std`   | `0.0`   | Gaussian noise pada target action            |
 | `dataset.normalizer_mode`    | `limits`| `limits` atau `gaussian`                     |
 
-Override via Hydra, mis. `dataset.obs_noise_std=0.02`.
+Override via Hydra, mis. `task.dataset.obs_noise_std=0.02`.
+
+## Profil preprocessing (`task.dataset.preprocessing_profile`)
+
+| Profil | Sliding (stride) | Noise | Split train/val |
+|--------|------------------|-------|------------------|
+| `standard` | 1 (overlap) | ya (default yaml) | `val_ratio` atau indeks CV |
+| `minimal` | 1 (overlap) | tidak | idem |
+| `raw` | `horizon` (tanpa overlap) | tidak | tanpa holdout acak jika **tanpa** indeks episode; dengan indeks CV, split mengikuti daftar itu |
+| `legacy_minimal` | `horizon` | tidak | `val_ratio=0` saja; **tidak** kompatibel dengan indeks episode eksplisit |
+
+Eksperimen hanya jalur “tanpa preprocessing” (artian di atas):  
+`bash scripts/run_experiment.sh 0 --profiles raw`
 
 ## OFAT hyperparameter sweep (8 HP x 4 nilai x 3 seed = 96 run)
 
@@ -200,24 +249,33 @@ python infer_kitchen.py \
 
 ## Random search hyperparameter (alternatif)
 
-Skrip `scripts/random_search_kitchen.py` melakukan random search pada 8
-hyperparameter, 30 konfigurasi acak × 3 seed `[0, 42, 101]`, dengan
-evaluasi akhir 50 episode per run.
+Skrip `scripts/random_search_kitchen.py` melakukan random search pada **11**
+hyperparameter (sesuai `flowpolicy_hyperparameter_finetuning.md` §2), 30
+konfigurasi acak × 3 seed `[0, 42, 101]`, dengan evaluasi akhir 50 episode
+per run. Ringkasan bisa diurutkan menurut **success rate** atau **trade-off**
+(`--sort-by`).
 
 Ruang sampling:
 
 | hyperparameter                                   | nilai                                |
 |--------------------------------------------------|--------------------------------------|
-| `training.num_epochs`                            | `[500, 1000, 3000, 5000]`            |
-| `optimizer.lr`                                   | `[1e-3, 5e-4, 1e-4, 1e-5]`           |
-| `dataloader.batch_size`                          | `[64, 128, 256, 512]`                |
+| `training.num_epochs`                          | `[500, 1000, 3000, 5000]`            |
+| `optimizer.lr`                                 | `[1e-3, 5e-4, 1e-4, 1e-5]`           |
+| `dataloader.batch_size`                        | `[64, 128, 256, 512]`                |
 | `policy.Conditional_ConsistencyFM.num_segments`  | `[1, 2, 3, 4]`                       |
-| `policy.Conditional_ConsistencyFM.eps`           | `[1e-2, 1e-3, 1e-4, 1.0]`            |
-| `policy.Conditional_ConsistencyFM.delta`         | `[1e-2, 1e-3, 1e-4, 1.0]`            |
-| `n_action_steps`                                 | `[2, 4, 6, 8]`                       |
-| `n_obs_steps`                                    | `[4, 6, 8, 16]`                      |
+| `policy.Conditional_ConsistencyFM.eps`         | `[1e-4, 1e-3, 1e-2, 1.0]`            |
+| `policy.Conditional_ConsistencyFM.delta`       | `[1e-4, 1e-3, 1e-2, 1.0]`            |
+| `n_action_steps`                               | `[2, 4, 6, 8]`                       |
+| `n_obs_steps`                                  | `[4, 6, 8, 16]`                      |
+| `policy.diffusion_step_embed_dim`              | `[128, 256, 512, 1024]`              |
+| `_state_mlp_hidden` → `policy.state_mlp_size`  | `[128, 256, 512, 1024]` (dua layer)  |
+| `_unet_base_width` → `policy.down_dims`        | `[b, min(2b,1024), min(4b,1024)]`    |
 
-`horizon` dihitung otomatis sebagai `max(n_obs_steps + n_action_steps - 1, 4)`.
+Metrik inferensi menyertakan **`trade_off`** = `test_mean_score / mean_time`
+(lihat `infer_kitchen.py`).
+
+`horizon` dihitung otomatis dari `n_obs_steps` dan `n_action_steps` (lihat
+`flowpolicy.yaml`).
 
 Menjalankan:
 
@@ -228,6 +286,9 @@ bash scripts/random_search_kitchen.sh 0 --dry-run
 
 # eksekusi sebenarnya di GPU 0
 bash scripts/random_search_kitchen.sh 0
+
+# urutkan summary menurut trade-off (bukan success rate)
+bash scripts/random_search_kitchen.sh 0 --sort-by trade_off
 ```
 
 Keluaran di `data/outputs/random_search/`:
@@ -245,22 +306,48 @@ Keluaran di `data/outputs/random_search/`:
 Resume otomatis: jika `metrics.json` untuk `(cfg_idx, seed)` tertentu
 sudah valid, skrip melewatinya.
 
+## Eksperimen CV + multi-seed + profil preprocessing
+
+Skrip `scripts/run_experiment.py` (wrapper: `scripts/run_experiment.sh`)
+menyapu **seed × preprocessing × N konfigurasi random (sampling sekali) ×
+K-fold episode**, lalu menulis `results.csv`, `summary.csv`, dan plot di
+`plots/`. Lihat juga `scripts/cv_splits.py` untuk menghasilkan `cv_splits.json`
+mandiri.
+
+```bash
+cd FlowPolicy
+bash scripts/run_experiment.sh 0 --dry-run
+bash scripts/run_experiment.sh 0 --output-dir data/outputs/experiment \\
+  --n-configs 10 --n-folds 5 --skip-plots   # tanpa matplotlib
+```
+
+Setiap sel (cfg × seed × profil × fold) menulis ke folder run **unik**
+``runs/<sel>__<YYYYMMDD_HHMMSS>_<uuid8>/``; training **tidak** resume checkpoint
+Hydra dan run WandB **tidak** dilanjutkan (``logging.id`` baru per subproses).
+``summarize.py`` / ``plot_results.py`` mendeduplikasi ``results.csv`` per
+(cfg, profile, fold, seed) memakai **timestamp** terbaru bila Anda mengulang
+eksperimen di ``output-dir`` yang sama.
+
 ## Inferensi (checkpoint → video + metrik)
 
 Setelah training, jalankan inferensi mandiri (tanpa WandB kecuali `--wandb`):
 
 ```bash
 cd FlowPolicy
+# Checkpoint mengikuti folder run terbaru, pola:
+#   .../kitchen_complete-flowpolicy_seed0_standard__20260504_153012_a1b2c3d4/checkpoints/latest.ckpt
+#   .../kitchen_complete-flowpolicy_seed0_minimal__20260504_153045_b2c3d4e5/checkpoints/latest.ckpt
+ls -dt data/outputs/kitchen_complete-flowpolicy_seed0_* | head -1
 python infer_kitchen.py \
-  --checkpoint data/outputs/kitchen_complete-flowpolicy_seed0/checkpoints/latest.ckpt \
+  --checkpoint "$(ls -dt data/outputs/kitchen_complete-flowpolicy_seed0_standard__*/checkpoints/latest.ckpt 2>/dev/null | head -1)" \
   --episodes 10 \
   --device cuda:0
 ```
 
-Atau lewat skrip:
+Atau lewat skrip (ganti path checkpoint ke hasil `ls` / folder run Anda):
 
 ```bash
-bash scripts/infer_kitchen.sh data/outputs/kitchen_complete-flowpolicy_seed0/checkpoints/latest.ckpt 0 10
+bash scripts/infer_kitchen.sh data/outputs/kitchen_complete-flowpolicy_seed0_standard__DATE_TIME_HEX/checkpoints/latest.ckpt 0 10
 ```
 
 Keluaran default: folder `data/outputs/<run>/inference_latest/` berisi:

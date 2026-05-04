@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Random search untuk FlowPolicy di FrankaKitchen-v1.
+"""Random search untuk FlowPolicy di FrankaKitchen-v1 (§4 dokumen
+`flowpolicy_hyperparameter_finetuning.md`).
 
 Melakukan:
-1. Sampling N konfigurasi acak dari ruang hyperparameter yang ditentukan.
-2. Untuk setiap konfigurasi x seed, jalankan `train.py` (via subprocess
-   Hydra) lalu `infer_kitchen.py` (50 episode) terhadap checkpoint final.
-3. Agregasi hasil ke `results.csv` (per run) dan `summary.csv` (mean ± std
-   per konfigurasi di 3 seed), diurutkan berdasarkan mean success rate.
+1. Sampling N konfigurasi acak dari ruang hyperparameter §2 (11 knob:
+   epoch, lr, batch, FM num_segments/eps/delta, n_action_steps, n_obs_steps,
+   diffusion_step_embed_dim, lebar MLP state encoder, lebar kanal UNet).
+2. Untuk setiap konfigurasi × seed, jalankan `train.py` (Hydra) lalu
+   `infer_kitchen.py` (50 episode) terhadap checkpoint final.
+3. Agregasi hasil ke `results.csv` dan `summary.csv` (mean ± std per
+   konfigurasi di 3 seed), diurutkan menurut `--sort-by`.
+
+Metrik inferensi mencakup `trade_off` = test_mean_score / mean_time (§5.3).
 
 Resume: jika `metrics.json` valid sudah ada untuk sebuah
 `(cfg_idx, seed)`, skrip melewatinya.
@@ -15,6 +20,7 @@ Contoh:
   cd FlowPolicy
   python scripts/random_search_kitchen.py --gpu 0
   python scripts/random_search_kitchen.py --gpu 0 --dry-run
+  python scripts/random_search_kitchen.py --gpu 0 --sort-by trade_off
 """
 
 from __future__ import annotations
@@ -32,17 +38,21 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 
 SEARCH_SPACE: Dict[str, List[Any]] = {
-    # Training
-    "training.num_epochs":                           [500, 1000, 3000, 5000],
-    "optimizer.lr":                                  [1e-3, 1e-4, 1e-5, 5e-4],
-    "dataloader.batch_size":                         [64, 128, 256, 512],
-    # Consistency flow-matching (policy)
+    # --- Tabel §2 flowpolicy_hyperparameter_finetuning.md ---
+    "training.num_epochs": [500, 1000, 3000, 5000],
+    "optimizer.lr": [1e-3, 5e-4, 1e-4, 1e-5],
+    "dataloader.batch_size": [64, 128, 256, 512],
     "policy.Conditional_ConsistencyFM.num_segments": [1, 2, 3, 4],
-    "policy.Conditional_ConsistencyFM.eps":          [1e-2, 1e-3, 1e-4, 1.0],
-    "policy.Conditional_ConsistencyFM.delta":        [1e-2, 1e-3, 1e-4, 1.0],
-    # Horizon-related (horizon akan otomatis disesuaikan oleh yaml)
-    "n_action_steps":                                [2, 4, 6, 8],
-    "n_obs_steps":                                   [4, 6, 8, 16],
+    "policy.Conditional_ConsistencyFM.eps": [1e-4, 1e-3, 1e-2, 1.0],
+    "policy.Conditional_ConsistencyFM.delta": [1e-4, 1e-3, 1e-2, 1.0],
+    "n_action_steps": [2, 4, 6, 8],
+    "n_obs_steps": [4, 6, 8, 16],
+    # Pemetaan dokumen: time_embedding_dim → diffusion_step_embed_dim
+    "policy.diffusion_step_embed_dim": [128, 256, 512, 1024],
+    # hidden_dim (MLP state encoder) → policy.state_mlp_size=[h,h] (di-expand di build_train_cmd)
+    "_state_mlp_hidden": [128, 256, 512, 1024],
+    # hidden_dim (lebar kanal UNet) → policy.down_dims (di-expand)
+    "_unet_base_width": [128, 256, 512, 1024],
 }
 
 DEFAULT_SEEDS: List[int] = [0, 42, 101]
@@ -70,8 +80,25 @@ def format_override(key: str, value: Any) -> str:
     return f"{key}={value}"
 
 
+def _expand_policy_arch_overrides(cfg: Dict[str, Any]) -> List[str]:
+    """Kunci internal `_state_mlp_hidden` / `_unet_base_width` → override Hydra."""
+    extra: List[str] = []
+    h = cfg.get("_state_mlp_hidden")
+    if h is not None:
+        hi = int(h)
+        extra.append(f"policy.state_mlp_size=[{hi},{hi}]")
+    b = cfg.get("_unet_base_width")
+    if b is not None:
+        bi = int(b)
+        d2 = min(2 * bi, 1024)
+        d3 = min(4 * bi, 1024)
+        extra.append(f"policy.down_dims=[{bi},{d2},{d3}]")
+    return extra
+
+
 def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
-                    save_ckpt: bool = True) -> List[str]:
+                    save_ckpt: bool = True,
+                    preprocessing_profile: str = "standard") -> List[str]:
     overrides = [
         "--config-name=flowpolicy",
         "task=kitchen_complete",
@@ -83,12 +110,15 @@ def build_train_cmd(cfg: Dict[str, Any], seed: int, run_dir: pathlib.Path,
         f"logging.name=random_search_{run_dir.name}",
         "logging.mode=offline",
         f"checkpoint.save_ckpt={'True' if save_ckpt else 'False'}",
+        f"task.dataset.preprocessing_profile={preprocessing_profile}",
     ]
     for k, v in cfg.items():
+        if k.startswith("_"):
+            continue
         overrides.append(format_override(k, v))
-        # batch_size juga disamakan untuk val_dataloader
         if k == "dataloader.batch_size":
             overrides.append(format_override("val_dataloader.batch_size", v))
+    overrides.extend(_expand_policy_arch_overrides(cfg))
 
     return [sys.executable, "train.py", *overrides]
 
@@ -133,7 +163,7 @@ def load_existing_results(results_csv: pathlib.Path) -> List[Dict[str, str]]:
 
 
 def write_summary(results_csv: pathlib.Path, summary_csv: pathlib.Path,
-                  configs: List[Dict[str, Any]]) -> None:
+                  configs: List[Dict[str, Any]], sort_by: str) -> None:
     rows = load_existing_results(results_csv)
     if not rows:
         print("[summary] results.csv kosong, summary dilewati.")
@@ -149,7 +179,12 @@ def write_summary(results_csv: pathlib.Path, summary_csv: pathlib.Path,
         grouped.setdefault(cid, []).append(r)
 
     param_keys = list(SEARCH_SPACE.keys())
-    metric_keys = ["test_mean_score", "mean_n_completed_tasks", "mean_time"]
+    metric_keys = [
+        "test_mean_score",
+        "mean_n_completed_tasks",
+        "mean_time",
+        "trade_off",
+    ]
 
     summary_rows: List[Dict[str, Any]] = []
     for cid, runs in grouped.items():
@@ -179,8 +214,19 @@ def write_summary(results_csv: pathlib.Path, summary_csv: pathlib.Path,
                 summary_row[f"{mk}_std"] = float("nan")
         summary_rows.append(summary_row)
 
+    def _finite_sort_key(row: Dict[str, Any], col: str) -> float:
+        v = row.get(col, float("-inf"))
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            return float("-inf")
+        if x != x:  # NaN
+            return float("-inf")
+        return x
+
+    sort_key = f"{sort_by}_mean"
     summary_rows.sort(
-        key=lambda r: r.get("test_mean_score_mean", float("-inf")),
+        key=lambda r: _finite_sort_key(r, sort_key),
         reverse=True,
     )
 
@@ -199,11 +245,12 @@ def write_summary(results_csv: pathlib.Path, summary_csv: pathlib.Path,
         for r in summary_rows:
             writer.writerow(r)
     print(f"[summary] {summary_csv}  ({len(summary_rows)} konfigurasi)")
-    print(f"[summary] Top-3 (mean test_mean_score):")
+    print(f"[summary] Top-3 (mean {sort_by}):")
     for r in summary_rows[:3]:
-        print(f"  cfg {r['cfg_idx']}: "
-              f"SR={r.get('test_mean_score_mean'):.4f} ± "
-              f"{r.get('test_mean_score_std'):.4f}  ({r.get('n_seeds')} seeds)")
+        m = r.get(f"{sort_by}_mean", float("nan"))
+        s = r.get(f"{sort_by}_std", float("nan"))
+        print(f"  cfg {r['cfg_idx']}: {sort_by}={m:.6g} ± {s:.6g}  "
+              f"({r.get('n_seeds')} seeds)")
 
 
 def run_subprocess(cmd: Sequence[str], log_path: pathlib.Path,
@@ -238,8 +285,27 @@ def main() -> int:
                         help="Cetak daftar konfigurasi tanpa menjalankan training")
     parser.add_argument("--skip-summary", action="store_true",
                         help="Jangan tulis summary.csv di akhir")
+    parser.add_argument(
+        "--sort-by",
+        choices=("test_mean_score", "trade_off"),
+        default="test_mean_score",
+        help="Kolom untuk mengurutkan summary.csv (mean ± std)",
+    )
     parser.add_argument("--only-cfg", type=int, nargs="+", default=None,
                         help="Hanya jalankan cfg_idx ini (untuk debugging)")
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Hanya baca results.csv + configs.json lalu tulis summary.csv "
+             "(tidak training/infer). Pakai dengan --out-root yang sama.",
+    )
+    parser.add_argument(
+        "--preprocessing-profile",
+        choices=("standard", "minimal", "legacy_minimal"),
+        default="standard",
+        help="dataset.preprocessing_profile: standard | minimal (sliding, no aug) "
+             "| legacy_minimal (stride=horizon, no split, no aug).",
+    )
     args = parser.parse_args()
 
     script_dir = pathlib.Path(__file__).resolve().parent
@@ -252,6 +318,18 @@ def main() -> int:
     results_csv = out_root / "results.csv"
     summary_csv = out_root / "summary.csv"
     configs_json = out_root / "configs.json"
+
+    if args.summary_only:
+        if not results_csv.is_file() or not configs_json.is_file():
+            print("[error] --summary-only memerlukan results.csv dan configs.json "
+                  f"di {out_root}")
+            return 1
+        with open(configs_json, "r", encoding="utf-8") as f:
+            configs_reload = json.load(f)
+        write_summary(results_csv, summary_csv, configs_reload,
+                      sort_by=args.sort_by)
+        print("[done] summary-only selesai.")
+        return 0
 
     configs = sample_configs(args.n_configs, args.sampling_seed)
 
@@ -296,7 +374,8 @@ def main() -> int:
                         print(f"  [skip] metrics sudah ada: "
                               f"SR={metrics['test_mean_score']:.4f}")
                         _append_run_row(results_csv, i, seed, cfg, metrics,
-                                        status="skip_resume")
+                                        status="skip_resume",
+                                        preprocessing_profile=args.preprocessing_profile)
                         continue
                 except Exception:
                     pass
@@ -307,7 +386,10 @@ def main() -> int:
             if ckpt_path.is_file():
                 print(f"  [skip-train] checkpoint sudah ada: {ckpt_path}")
             else:
-                train_cmd = build_train_cmd(cfg, seed, run_dir, save_ckpt=True)
+                train_cmd = build_train_cmd(
+                    cfg, seed, run_dir, save_ckpt=True,
+                    preprocessing_profile=args.preprocessing_profile,
+                )
                 print(f"  [train] {' '.join(train_cmd)}")
                 rc = run_subprocess(
                     train_cmd, run_dir / "train_stdout.log", env=env)
@@ -315,7 +397,8 @@ def main() -> int:
                     print(f"  [ERROR] training gagal (rc={rc}), skip inferensi.")
                     _append_run_row(results_csv, i, seed, cfg, {},
                                     status=f"train_failed_rc{rc}",
-                                    t_train=time.time() - t0)
+                                    t_train=time.time() - t0,
+                                    preprocessing_profile=args.preprocessing_profile)
                     continue
             t_train = time.time() - t0
 
@@ -339,11 +422,12 @@ def main() -> int:
 
             _append_run_row(results_csv, i, seed, cfg, metrics,
                             status="ok" if metrics else f"infer_failed_rc{rc}",
-                            t_train=t_train, t_infer=t_infer)
+                            t_train=t_train, t_infer=t_infer,
+                            preprocessing_profile=args.preprocessing_profile)
 
     # Summary
     if not args.skip_summary:
-        write_summary(results_csv, summary_csv, configs)
+        write_summary(results_csv, summary_csv, configs, sort_by=args.sort_by)
     print("[done] Selesai.")
     return 0
 
@@ -351,14 +435,24 @@ def main() -> int:
 def _append_run_row(results_csv: pathlib.Path, cfg_idx: int, seed: int,
                     cfg: Dict[str, Any], metrics: Dict[str, float],
                     status: str,
-                    t_train: float = 0.0, t_infer: float = 0.0) -> None:
+                    t_train: float = 0.0, t_infer: float = 0.0,
+                    preprocessing_profile: str = "standard") -> None:
     row: Dict[str, Any] = {"cfg_idx": cfg_idx, "seed": seed}
+    row["dataset.preprocessing_profile"] = preprocessing_profile
     for k in SEARCH_SPACE.keys():
         row[k] = cfg.get(k)
     for mk in ("test_mean_score", "mean_n_completed_tasks", "mean_time",
-               "mean_success_rates", "SR_test_L3", "SR_test_L5"):
+               "mean_success_rates", "SR_test_L3", "SR_test_L5", "trade_off"):
         v = metrics.get(mk)
         row[mk] = float(v) if v is not None else ""
+    if row.get("trade_off") == "":
+        try:
+            sr = float(row.get("test_mean_score", ""))
+            mt = float(row.get("mean_time", ""))
+            if mt > 1e-12:
+                row["trade_off"] = sr / mt
+        except (TypeError, ValueError):
+            pass
     row["status"] = status
     row["t_train_s"] = round(t_train, 2)
     row["t_infer_s"] = round(t_infer, 2)

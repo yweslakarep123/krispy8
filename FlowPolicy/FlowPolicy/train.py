@@ -115,6 +115,8 @@ import random
 import wandb
 import tqdm
 import numpy as np
+import json
+import sys
 from termcolor import cprint
 import shutil
 import time
@@ -131,6 +133,90 @@ import warnings
 warnings.filterwarnings("ignore")
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
+
+
+def wandb_log_train_metrics(wandb_run, step_log, global_step):
+    """Log metrics vs training global_step, not wandb's run-internal step counter.
+
+    When ``wandb.init(..., resume=True)`` continues a run, the internal step can stay
+    at the previous maximum while ``global_step`` from a checkpoint restarts lower;
+    passing ``step=`` to ``wandb.log`` then triggers out-of-order warnings. Using
+    ``define_metric`` + logging ``train/step`` in the payload avoids that.
+    """
+    payload = {"train/step": int(global_step)}
+    for key, value in step_log.items():
+        payload[f"train/{key}"] = value
+    wandb_run.log(payload)
+
+
+def print_run_configuration_banner(
+    cfg: OmegaConf,
+    output_dir: str,
+    *,
+    len_train_ds: int,
+    len_val_ds: int,
+    len_train_dl: int,
+    len_val_dl: int,
+) -> None:
+    """Cetak ringkasan konfigurasi ke terminal (stdout)."""
+    td = cfg.task.dataset
+    profile = OmegaConf.select(td, "preprocessing_profile", default="?")
+    val_ratio = OmegaConf.select(td, "val_ratio", default=None)
+    tr_ix = OmegaConf.select(td, "train_episode_indices", default=None)
+    va_ix = OmegaConf.select(td, "val_episode_indices", default=None)
+
+    def _fmt_epi(node):
+        if node is None:
+            return "null"
+        try:
+            lst = OmegaConf.to_container(node, resolve=True)
+        except Exception:
+            return str(node)
+        if isinstance(lst, (list, tuple)) and len(lst) > 24:
+            return f"[{len(lst)} indeks] {list(lst[:8])}..."
+        return str(lst)
+
+    lr = OmegaConf.select(cfg, "optimizer.lr", default=None)
+    bs = OmegaConf.select(cfg, "dataloader.batch_size", default=None)
+    cfm = OmegaConf.select(cfg, "policy.Conditional_ConsistencyFM", default=None)
+    cfm_s = ""
+    if cfm is not None:
+        try:
+            d = OmegaConf.to_container(cfm, resolve=True)
+            if isinstance(d, dict):
+                cfm_s = ", ".join(f"{k}={d[k]}" for k in sorted(d.keys()))
+        except Exception:
+            cfm_s = str(cfm)
+
+    lines = [
+        "",
+        "=" * 72,
+        " KONFIGURASI RUN (training ini)",
+        "=" * 72,
+        f"  output_dir ........................ {output_dir}",
+        f"  exp_name .......................... {cfg.get('exp_name', '')}",
+        f"  training.seed / device ............ {cfg.training.seed} / {cfg.training.device}",
+        f"  training.resume / debug ......... {cfg.training.resume} / {cfg.training.debug}",
+        f"  training.num_epochs ............... {cfg.training.num_epochs}",
+        f"  training.use_ema .................. {cfg.training.use_ema}",
+        f"  optimizer.lr ...................... {lr}",
+        f"  dataloader.batch_size ............. {bs}",
+        f"  n_obs_steps / n_action_steps ...... {cfg.n_obs_steps} / {cfg.n_action_steps}",
+        f"  horizon ........................... {cfg.horizon}",
+        f"  task.dataset.preprocessing_profile  {profile}",
+        f"  task.dataset.val_ratio ............ {val_ratio}",
+        f"  task.dataset.train_episode_indices  {_fmt_epi(tr_ix)}",
+        f"  task.dataset.val_episode_indices .. {_fmt_epi(va_ix)}",
+        f"  |train dataset| / |val dataset| ... {len_train_ds} / {len_val_ds}",
+        f"  |train batches| / |val batches| ... {len_train_dl} / {len_val_dl}",
+        f"  policy.Conditional_ConsistencyFM .. {cfm_s or '(n/a)'}",
+        "=" * 72,
+        "",
+    ]
+    for line in lines:
+        cprint(line, "cyan")
+    sys.stdout.flush()
+
 
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
@@ -204,9 +290,58 @@ class TrainFlowPolicyWorkspace:
         train_dataloader = DataLoader(dataset, **cfg.dataloader)
         normalizer = dataset.get_normalizer()
 
+        # #region agent log
+        try:
+            _json_dbg = __import__("json")
+            with open(
+                "/home/daffa/Documents/krispy8/.cursor/debug-3a4aa7.log",
+                "a",
+                encoding="utf-8",
+            ) as _df:
+                _df.write(
+                    _json_dbg.dumps(
+                        {
+                            "sessionId": "3a4aa7",
+                            "runId": "pre-fix",
+                            "hypothesisId": "H1_H2",
+                            "location": "train.py:run:after_dataloader",
+                            "message": "training scale snapshot",
+                            "timestamp": int(time.time() * 1000),
+                            "data": {
+                                "num_epochs": int(cfg.training.num_epochs),
+                                "len_dataset": len(dataset),
+                                "len_train_dataloader": len(train_dataloader),
+                                "batch_size": int(cfg.dataloader.batch_size),
+                                "debug": bool(cfg.training.debug),
+                                "max_train_steps": (
+                                    cfg.training.max_train_steps
+                                    if cfg.training.max_train_steps is not None
+                                    else None
+                                ),
+                                "gradient_accumulate_every": int(
+                                    cfg.training.gradient_accumulate_every
+                                ),
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+
         # configure validation dataset
         val_dataset = dataset.get_validation_dataset()
         val_dataloader = DataLoader(val_dataset, **cfg.val_dataloader)
+
+        print_run_configuration_banner(
+            cfg,
+            str(pathlib.Path(self.output_dir)),
+            len_train_ds=len(dataset),
+            len_val_ds=len(val_dataset),
+            len_train_dl=len(train_dataloader),
+            len_val_dl=len(val_dataloader),
+        )
 
         self.model.set_normalizer(normalizer)
         if cfg.training.use_ema:
@@ -247,16 +382,150 @@ class TrainFlowPolicyWorkspace:
         cprint(f"[WandB] name: {cfg.logging.name}", "yellow")
         cprint("-----------------------------", "yellow")
         # configure logging
+        _wb_cfg = OmegaConf.to_container(cfg, resolve=True)
+        # #region agent log
+        try:
+            import json as _json
+
+            _od_in_cfg = (
+                _wb_cfg.get("output_dir") if isinstance(_wb_cfg, dict) else None
+            )
+            with open(
+                "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
+                "a",
+                encoding="utf-8",
+            ) as _df:
+                _df.write(
+                    _json.dumps(
+                        {
+                            "sessionId": "f5ed5b",
+                            "hypothesisId": "H1_H4",
+                            "location": "train.py:wandb_pre_init",
+                            "message": "paths before wandb.init",
+                            "timestamp": int(time.time() * 1000),
+                            "data": {
+                                "self_output_dir": str(self.output_dir),
+                                "container_output_dir": (
+                                    str(_od_in_cfg) if _od_in_cfg is not None else None
+                                ),
+                                "hydra_runtime_output_dir": str(
+                                    HydraConfig.get().runtime.output_dir
+                                ),
+                                "logging_resume": bool(
+                                    OmegaConf.select(cfg, "logging.resume")
+                                ),
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
         wandb_run = wandb.init(
             dir=str(self.output_dir),
-            config=OmegaConf.to_container(cfg, resolve=True),
+            config=_wb_cfg,
             **cfg.logging
         )
-        wandb.config.update(
-            {
-                "output_dir": self.output_dir,
-            }
-        )
+        # #region agent log
+        try:
+            import json as _json
+
+            with open(
+                "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
+                "a",
+                encoding="utf-8",
+            ) as _df:
+                _df.write(
+                    _json.dumps(
+                        {
+                            "sessionId": "f5ed5b",
+                            "hypothesisId": "H5",
+                            "location": "train.py:wandb_post_init",
+                            "message": "wandb.config output_dir after init",
+                            "timestamp": int(time.time() * 1000),
+                            "data": {
+                                "wandb_config_output_dir": wandb.config.get(
+                                    "output_dir"
+                                ),
+                                "self_output_dir": str(self.output_dir),
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+        try:
+            wandb.config.update(
+                {"output_dir": self.output_dir},
+                allow_val_change=True,
+            )
+        except Exception as _wandb_upd_err:
+            # #region agent log
+            try:
+                import json as _json
+
+                with open(
+                    "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
+                    "a",
+                    encoding="utf-8",
+                ) as _df:
+                    _df.write(
+                        _json.dumps(
+                            {
+                                "sessionId": "f5ed5b",
+                                "hypothesisId": "H2_H3_H5",
+                                "location": "train.py:wandb_update_failed",
+                                "message": "config.update raised",
+                                "timestamp": int(time.time() * 1000),
+                                "data": {
+                                    "error_type": type(_wandb_upd_err).__name__,
+                                    "error_str": str(_wandb_upd_err)[:500],
+                                },
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+            raise
+        else:
+            # #region agent log
+            try:
+                import json as _json
+
+                with open(
+                    "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
+                    "a",
+                    encoding="utf-8",
+                ) as _df:
+                    _df.write(
+                        _json.dumps(
+                            {
+                                "sessionId": "f5ed5b",
+                                "runId": "post-fix",
+                                "hypothesisId": "VERIFY",
+                                "location": "train.py:wandb_post_update",
+                                "message": "output_dir synced after resume",
+                                "timestamp": int(time.time() * 1000),
+                                "data": {
+                                    "wandb_config_output_dir": str(
+                                        wandb.config.get("output_dir")
+                                    ),
+                                },
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
+
+        wandb.define_metric("train/step", hidden=True)
+        wandb.define_metric("train/*", step_metric="train/step")
 
         # configure checkpoint
         topk_manager = TopKCheckpointManager(
@@ -277,12 +546,25 @@ class TrainFlowPolicyWorkspace:
 
         # training loop
         log_path = os.path.join(self.output_dir, 'logs.json.txt')
-        for local_epoch_idx in range(cfg.training.num_epochs):
+        last_train_loss_epoch = float("nan")
+        last_val_loss_epoch = float("nan")
+        # #region agent log
+        _train_loop_t0 = time.time()
+        # #endregion
+        epoch_iterator = tqdm.tqdm(
+            range(cfg.training.num_epochs),
+            desc="Epochs",
+            leave=True,
+            mininterval=cfg.training.tqdm_interval_sec,
+            position=0,
+        )
+        for local_epoch_idx in epoch_iterator:
             step_log = dict()
             # ========= train for this epoch ==========
             train_losses = list()
-            with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}", 
-                    leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
+            with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}",
+                    leave=False, mininterval=cfg.training.tqdm_interval_sec,
+                    position=1) as tepoch:
                 for batch_idx, batch in enumerate(tepoch):
                     t1 = time.time()
                     # device transfer
@@ -332,7 +614,9 @@ class TrainFlowPolicyWorkspace:
                     is_last_batch = (batch_idx == (len(train_dataloader)-1))
                     if not is_last_batch:
                         # log of last step is combined with validation and rollout
-                        wandb_run.log(step_log, step=self.global_step)
+                        wandb_log_train_metrics(
+                            wandb_run, step_log, self.global_step
+                        )
                         self.global_step += 1
 
                     if (cfg.training.max_train_steps is not None) \
@@ -343,6 +627,7 @@ class TrainFlowPolicyWorkspace:
             # replace train_loss with epoch average
             train_loss = np.mean(train_losses)
             step_log['train_loss'] = train_loss
+            epoch_iterator.set_postfix(train=f"{train_loss:.4f}", refresh=False)
 
             # ========= eval for this epoch ==========
             policy = self.model
@@ -428,12 +713,58 @@ class TrainFlowPolicyWorkspace:
 
             # end of epoch
             # log of last step is combined with validation and rollout
-            wandb_run.log(step_log, step=self.global_step)
+            wandb_log_train_metrics(wandb_run, step_log, self.global_step)
             self.global_step += 1
             self.epoch += 1
+            last_train_loss_epoch = float(step_log.get("train_loss", float("nan")))
+            if "val_loss" in step_log:
+                last_val_loss_epoch = float(step_log["val_loss"])
             del step_log
 
-    def eval(self):
+        # #region agent log
+        try:
+            _json_dbg = __import__("json")
+            with open(
+                "/home/daffa/Documents/krispy8/.cursor/debug-3a4aa7.log",
+                "a",
+                encoding="utf-8",
+            ) as _df:
+                _df.write(
+                    _json_dbg.dumps(
+                        {
+                            "sessionId": "3a4aa7",
+                            "runId": "pre-fix",
+                            "hypothesisId": "H6",
+                            "location": "train.py:run:after_epoch_loop",
+                            "message": "epoch loop finished",
+                            "timestamp": int(time.time() * 1000),
+                            "data": {
+                                "elapsed_sec": round(time.time() - _train_loop_t0, 3),
+                                "epoch_counter": int(self.epoch),
+                                "num_epochs_cfg": int(cfg.training.num_epochs),
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+
+        try:
+            _metrics_end = {
+                "train_loss_final": last_train_loss_epoch,
+                "val_loss_final": last_val_loss_epoch,
+                "num_epochs": int(cfg.training.num_epochs),
+            }
+            with open(
+                os.path.join(self.output_dir, "training_end_metrics.json"),
+                "w",
+                encoding="utf-8",
+            ) as _mf:
+                json.dump(_metrics_end, _mf, indent=2)
+        except Exception:
+            pass
         # load the latest checkpoint
         
         cfg = copy.deepcopy(self.cfg)

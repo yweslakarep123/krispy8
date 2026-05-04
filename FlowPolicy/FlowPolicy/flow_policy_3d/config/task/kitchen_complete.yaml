@@ -37,11 +37,16 @@ env_runner:
 dataset:
   _target_: flow_policy_3d.dataset.kitchen_dataset.KitchenDataset
   dataset_id: D4RL/kitchen/complete-v2
+  # standard | minimal | legacy_minimal | raw (lihat docstring KitchenDataset).
+  preprocessing_profile: standard
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42
   val_ratio: 0.02
+  # Jika keduanya non-null list, split episode eksplisit (CV); val_ratio diabaikan.
+  train_episode_indices: null
+  val_episode_indices: null
   max_train_episodes: null
   download: true
   # Urutan sub-task: dipakai untuk (a) mengurutkan layout vektor goal

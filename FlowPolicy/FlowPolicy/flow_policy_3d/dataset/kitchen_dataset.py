@@ -21,6 +21,25 @@ Two additions on top of the original implementation:
    - `obs_noise_std`: Gaussian noise on the 59-dim `observation` part of
      `agent_pos` (not applied to the goal suffix which is static).
    - `action_noise_std`: Gaussian noise on the action target.
+
+4. ``preprocessing_profile`` (Hydra ``task.dataset.preprocessing_profile``):
+   - ``standard`` (default): sliding windows (stride 1), train/val split via
+     ``val_ratio`` **or** explicit ``train_episode_indices`` /
+     ``val_episode_indices``, augmentation from ``obs_noise_std`` /
+     ``action_noise_std``.
+   - ``minimal``: sliding stride 1, same splits as ``standard``, **no**
+     Gaussian augmentation (noise std forced to 0).
+   - ``legacy_minimal``: ablation lama — stride = ``horizon`` (jendela tidak
+     overlap), ``val_ratio`` dipaksa 0, tanpa noise. Tidak kompatibel dengan
+     daftar episode eksplisit (akan memicu ``ValueError``).
+   - ``raw``: stride = ``horizon`` (tanpa sliding overlap), tanpa noise,
+     tanpa split acak (``val_ratio`` efektif 0 bila tidak pakai daftar episode).
+     Boleh dipakai bersama ``train_episode_indices`` / ``val_episode_indices``
+     (mis. CV): stride horizon tetap dipakai.
+
+5. **Episode-level CV (opsional):** jika ``train_episode_indices`` dan
+   ``val_episode_indices`` keduanya diset (daftar indeks episode buffer 0..N-1),
+   ``val_ratio`` diabaikan dan mask diambil dari daftar tersebut.
 """
 
 from typing import Dict, List, Optional, Sequence
@@ -146,17 +165,88 @@ class KitchenDataset(BaseDataset):
                  action_noise_std: float = 0.0,
                  obs_noise_dim: Optional[int] = None,
                  normalizer_mode: str = 'limits',
+                 preprocessing_profile: str = 'standard',
+                 train_episode_indices: Optional[Sequence[int]] = None,
+                 val_episode_indices: Optional[Sequence[int]] = None,
                  ):
         super().__init__()
         import minari
 
         self.task_name = task_name
         self.dataset_id = dataset_id
+        self.preprocessing_profile = str(preprocessing_profile).strip().lower()
+        if self.preprocessing_profile not in (
+                'standard', 'minimal', 'legacy_minimal', 'raw'):
+            raise ValueError(
+                "preprocessing_profile must be 'standard', 'minimal', "
+                f"'legacy_minimal', or 'raw', got {preprocessing_profile!r}")
+
+        def _as_int_list(seq) -> Optional[List[int]]:
+            if seq is None:
+                return None
+            return [int(x) for x in list(seq)]
+
+        self._train_epi = _as_int_list(train_episode_indices)
+        self._val_epi = _as_int_list(val_episode_indices)
+        use_episode_lists = (
+            self._train_epi is not None and len(self._train_epi) > 0
+            and self._val_epi is not None and len(self._val_epi) > 0)
+        tr_nonempty = self._train_epi is not None and len(self._train_epi) > 0
+        va_nonempty = self._val_epi is not None and len(self._val_epi) > 0
+        if tr_nonempty != va_nonempty:
+            raise ValueError(
+                "train_episode_indices and val_episode_indices must both be "
+                "non-empty lists or both omitted / null.")
+        if use_episode_lists and self.preprocessing_profile == 'legacy_minimal':
+            raise ValueError(
+                "legacy_minimal cannot be combined with explicit episode indices; "
+                "use 'minimal' or 'standard' for CV.")
+
         self.tasks_to_complete = (
             list(tasks_to_complete) if tasks_to_complete is not None else None)
         self.enforce_task_order = enforce_task_order
-        self.obs_noise_std = float(obs_noise_std)
-        self.action_noise_std = float(action_noise_std)
+
+        if self.preprocessing_profile == 'legacy_minimal':
+            cprint(
+                "[KitchenDataset] preprocessing_profile=legacy_minimal: "
+                "stride=horizon, val_ratio=0, no augmentation",
+                "yellow",
+            )
+            val_ratio_effective = 0.0
+            self.obs_noise_std = 0.0
+            self.action_noise_std = 0.0
+            sequence_stride = max(1, int(horizon))
+        elif self.preprocessing_profile == 'raw':
+            cprint(
+                "[KitchenDataset] preprocessing_profile=raw: "
+                "stride=horizon (no sliding overlap), no Gaussian augmentation; "
+                "tanpa split acak val_ratio bila tidak pakai daftar episode eksplisit",
+                "yellow",
+            )
+            val_ratio_effective = 0.0
+            self.obs_noise_std = 0.0
+            self.action_noise_std = 0.0
+            sequence_stride = max(1, int(horizon))
+        elif self.preprocessing_profile == 'minimal':
+            cprint(
+                "[KitchenDataset] preprocessing_profile=minimal: "
+                "sliding stride 1, no Gaussian augmentation",
+                "yellow",
+            )
+            val_ratio_effective = float(val_ratio)
+            self.obs_noise_std = 0.0
+            self.action_noise_std = 0.0
+            sequence_stride = 1
+        else:  # standard
+            val_ratio_effective = float(val_ratio)
+            self.obs_noise_std = float(obs_noise_std)
+            self.action_noise_std = float(action_noise_std)
+            sequence_stride = 1
+
+        # Profil ``raw`` tetap stride=horizon meski ada daftar episode (CV).
+        if use_episode_lists and self.preprocessing_profile != 'raw':
+            sequence_stride = 1  # CV: sliding penuh kecuali ``raw``
+
         self.obs_noise_dim = obs_noise_dim
         self.normalizer_mode = normalizer_mode
         self._is_train_split = True  # val split flips this to False in copy
@@ -269,17 +359,42 @@ class KitchenDataset(BaseDataset):
                f"action_dim={self._action_dim} "
                f"robot_obs_dim(for noise)={self._robot_obs_dim}", 'cyan')
 
-        val_mask = get_val_mask(
-            n_episodes=replay_buffer.n_episodes,
-            val_ratio=val_ratio,
-            seed=seed,
-        )
-        train_mask = ~val_mask
-        train_mask = downsample_mask(
-            mask=train_mask,
-            max_n=max_train_episodes,
-            seed=seed,
-        )
+        n_ep = replay_buffer.n_episodes
+        if use_episode_lists:
+            train_set = set(self._train_epi)
+            val_set = set(self._val_epi)
+            if train_set & val_set:
+                raise ValueError(
+                    f"train/val episode overlap: {train_set & val_set}")
+            for i in self._train_epi + self._val_epi:
+                if i < 0 or i >= n_ep:
+                    raise ValueError(
+                        f"episode index {i} out of range for n_episodes={n_ep}")
+            train_mask = np.zeros(n_ep, dtype=bool)
+            val_mask_arr = np.zeros(n_ep, dtype=bool)
+            for i in self._train_epi:
+                train_mask[int(i)] = True
+            for i in self._val_epi:
+                val_mask_arr[int(i)] = True
+            # Do not subsample train episodes when using fixed CV masks.
+            self._val_episode_mask = val_mask_arr
+        else:
+            val_mask = get_val_mask(
+                n_episodes=n_ep,
+                val_ratio=val_ratio_effective,
+                seed=seed,
+            )
+            train_mask = ~val_mask
+            train_mask = downsample_mask(
+                mask=train_mask,
+                max_n=max_train_episodes,
+                seed=seed,
+            )
+            has_val_holdout = bool(np.any(~train_mask))
+            self._val_episode_mask = (
+                (~train_mask) if has_val_holdout else train_mask)
+
+        self._sequence_stride = int(sequence_stride)
 
         self.sampler = SequenceSampler(
             replay_buffer=self.replay_buffer,
@@ -287,6 +402,7 @@ class KitchenDataset(BaseDataset):
             pad_before=pad_before,
             pad_after=pad_after,
             episode_mask=train_mask,
+            sequence_stride=self._sequence_stride,
         )
         self.train_mask = train_mask
         self.horizon = horizon
@@ -312,9 +428,10 @@ class KitchenDataset(BaseDataset):
             sequence_length=self.horizon,
             pad_before=self.pad_before,
             pad_after=self.pad_after,
-            episode_mask=~self.train_mask,
+            episode_mask=self._val_episode_mask,
+            sequence_stride=self._sequence_stride,
         )
-        val_set.train_mask = ~self.train_mask
+        val_set.train_mask = self._val_episode_mask
         val_set._is_train_split = False
         return val_set
 

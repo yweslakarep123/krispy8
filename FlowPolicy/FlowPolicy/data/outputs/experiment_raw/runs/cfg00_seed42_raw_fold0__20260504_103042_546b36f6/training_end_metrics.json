@@ -1,0 +1,5 @@
+{
+  "train_loss_final": 2.2347147776713427e-07,
+  "val_loss_final": NaN,
+  "num_epochs": 5000
+}

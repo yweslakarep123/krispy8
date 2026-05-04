@@ -59,6 +59,17 @@ def main():
         "--wandb", action="store_true",
         help="Jika diset, kirim video ke Weights & Biases (perlu wandb login)",
     )
+    parser.add_argument(
+        "--warmup-steps",
+        type=int,
+        default=20,
+        help="Jumlah dummy forward predict_action sebelum rollout (CUDA warm-up).",
+    )
+    parser.add_argument(
+        "--no-warmup",
+        action="store_true",
+        help="Lewati CUDA warm-up.",
+    )
     args = parser.parse_args()
 
     ckpt_path = pathlib.Path(args.checkpoint).expanduser().resolve()
@@ -95,45 +106,18 @@ def main():
         device = torch.device(args.device)
     policy.to(device)
 
-    # #region agent log
-    def _dbg_infer(msg: str, data: dict):
-        import time
-        try:
-            with open(
-                "/home/daffa/Documents/skpsi/.cursor/debug-6ac186.log",
-                "a",
-                encoding="utf-8",
-            ) as _f:
-                _f.write(
-                    json.dumps(
-                        {
-                            "sessionId": "6ac186",
-                            "runId": "infer-runner-cfg",
-                            "hypothesisId": "H1_struct_merge",
-                            "location": "infer_kitchen.py",
-                            "message": msg,
-                            "timestamp": int(time.time() * 1000),
-                            "data": data,
-                        },
-                        default=str,
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
+    if not args.no_warmup and args.warmup_steps > 0 and device.type == "cuda":
+        n_obs = int(OmegaConf.select(cfg, "n_obs_steps", default=2))
+        obs_shape = cfg.task.shape_meta.obs.agent_pos.shape
+        d = int(obs_shape[0])
+        dummy = torch.zeros(1, n_obs, d, device=device, dtype=torch.float32)
+        with torch.no_grad():
+            for _ in range(int(args.warmup_steps)):
+                policy.predict_action({"agent_pos": dummy})
+        torch.cuda.synchronize()
 
-    # #endregion
-
-    # H1: cfg.task.env_runner dari checkpoint sering struct=True → OmegaConf.merge
-    # tidak boleh menambah kunci baru (save_videos_dir, wandb_log). Solusi: plain dict.
+    # cfg.task.env_runner dari checkpoint sering struct=True → plain dict.
     _er = cfg.task.env_runner
-    _struct = bool(OmegaConf.is_config(_er) and OmegaConf.is_struct(_er))
-    _keys_before = list(OmegaConf.to_container(_er, resolve=True).keys())
-    _dbg_infer(
-        "env_runner before infer overrides",
-        {"is_struct": _struct, "keys": _keys_before},
-    )
-
     runner_dict = OmegaConf.to_container(_er, resolve=True)
     runner_dict["eval_episodes"] = args.episodes
     runner_dict["max_video_episodes"] = args.episodes
@@ -142,10 +126,6 @@ def main():
     runner_dict["wandb_log"] = bool(args.wandb)
     runner_cfg = OmegaConf.create(runner_dict)
     OmegaConf.set_struct(runner_cfg, False)
-    _dbg_infer(
-        "runner_cfg built from dict (struct disabled)",
-        {"keys": list(runner_dict.keys()), "save_videos_dir": runner_dict.get("save_videos_dir")},
-    )
 
     env_runner = hydra.utils.instantiate(runner_cfg, output_dir=str(out_dir))
 
@@ -158,23 +138,35 @@ def main():
 
     metrics = {}
     for k, v in log.items():
-        if isinstance(v, float):
-            metrics[k] = v
+        if isinstance(v, float) or isinstance(v, int):
+            metrics[k] = float(v)
         elif k == "saved_video_paths":
             metrics[k] = v
+
+    sr = float(log.get("test_mean_score", 0.0))
+    lat_s = float(log.get("mean_time", 0.0))
+    lat_ms = float(log.get("mean_inference_latency_ms", lat_s * 1000.0))
+    metrics.setdefault("mean_inference_latency_ms", lat_ms)
+    sr4 = float(log.get("success_rate_k4", sr))
+    metrics.setdefault("success_rate_k4", sr4)
+    if lat_s > 1e-12:
+        metrics["trade_off"] = sr / lat_s
+    else:
+        metrics["trade_off"] = float("nan")
+    if lat_ms > 1e-9:
+        metrics["trade_off_k4_per_ms"] = sr4 / lat_ms
+    else:
+        metrics["trade_off_k4_per_ms"] = float("nan")
 
     metrics_path = out_dir / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
-    sr = float(log.get("test_mean_score", 0.0))
-    lat_s = float(log.get("mean_time", 0.0))
-    lat_ms = lat_s * 1000.0
-
     print("\n========== HASIL INFERENSI ==========")
     print(f"Success rate (rata-rata fraksi task selesai per episode): {sr:.4f}")
     print(f"Mean inference latency (detik per langkah kontrol / per predict_action): {lat_s:.6f} s")
     print(f"Mean inference latency: {lat_ms:.3f} ms")
+    print(f"Trade-off k4/ms: {metrics.get('trade_off_k4_per_ms', float('nan')):.6f}")
     print(f"Mean completed tasks per episode: {log.get('mean_n_completed_tasks', 'n/a')}")
     print(f"Metrik tersimpan di: {metrics_path}")
     vids = log.get("saved_video_paths") or []

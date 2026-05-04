@@ -7,296 +7,61 @@
     "policy.Conditional_ConsistencyFM.eps": 0.001,
     "policy.Conditional_ConsistencyFM.delta": 0.001,
     "n_action_steps": 2,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 2,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 512,
-    "policy.Conditional_ConsistencyFM.num_segments": 3,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 8,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 3000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 3,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 8,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 3000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 8,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 3000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 6,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 512,
-    "policy.Conditional_ConsistencyFM.num_segments": 3,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.0001,
-    "n_action_steps": 4,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 3000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 4,
-    "n_obs_steps": 16
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 3,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 2,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 0.0001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 8,
-    "n_obs_steps": 16
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.0001,
-    "n_action_steps": 8,
-    "n_obs_steps": 16
-  },
-  {
-    "training.num_epochs": 3000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 2,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.0005,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 6,
-    "n_obs_steps": 4
+    "n_obs_steps": 4,
+    "policy.diffusion_step_embed_dim": 1024,
+    "_state_mlp_hidden": 128,
+    "_unet_base_width": 128
   },
   {
     "training.num_epochs": 500,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.0001,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 4,
-    "n_obs_steps": 16
-  },
-  {
-    "training.num_epochs": 500,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.0001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 4,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 6,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 2,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 1000,
     "optimizer.lr": 0.0005,
     "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 3,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
+    "policy.Conditional_ConsistencyFM.num_segments": 1,
+    "policy.Conditional_ConsistencyFM.eps": 0.001,
+    "policy.Conditional_ConsistencyFM.delta": 1.0,
     "n_action_steps": 4,
-    "n_obs_steps": 8
+    "n_obs_steps": 16,
+    "policy.diffusion_step_embed_dim": 512,
+    "_state_mlp_hidden": 128,
+    "_unet_base_width": 256
   },
   {
     "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 512,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 4,
-    "n_obs_steps": 4
+    "optimizer.lr": 0.0001,
+    "dataloader.batch_size": 256,
+    "policy.Conditional_ConsistencyFM.num_segments": 2,
+    "policy.Conditional_ConsistencyFM.eps": 0.001,
+    "policy.Conditional_ConsistencyFM.delta": 0.01,
+    "n_action_steps": 2,
+    "n_obs_steps": 4,
+    "policy.diffusion_step_embed_dim": 1024,
+    "_state_mlp_hidden": 128,
+    "_unet_base_width": 512
   },
   {
     "training.num_epochs": 3000,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
+    "optimizer.lr": 0.0001,
+    "dataloader.batch_size": 64,
+    "policy.Conditional_ConsistencyFM.num_segments": 4,
+    "policy.Conditional_ConsistencyFM.eps": 0.0001,
+    "policy.Conditional_ConsistencyFM.delta": 1.0,
     "n_action_steps": 2,
-    "n_obs_steps": 6
+    "n_obs_steps": 8,
+    "policy.diffusion_step_embed_dim": 512,
+    "_state_mlp_hidden": 256,
+    "_unet_base_width": 128
   },
   {
     "training.num_epochs": 500,
-    "optimizer.lr": 0.001,
+    "optimizer.lr": 0.0005,
     "dataloader.batch_size": 256,
     "policy.Conditional_ConsistencyFM.num_segments": 1,
     "policy.Conditional_ConsistencyFM.eps": 0.001,
     "policy.Conditional_ConsistencyFM.delta": 0.0001,
     "n_action_steps": 8,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.0005,
-    "dataloader.batch_size": 128,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 2,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 512,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 2,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 8,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 8,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 500,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 8,
-    "n_obs_steps": 16
-  },
-  {
-    "training.num_epochs": 1000,
-    "optimizer.lr": 0.0005,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 2,
-    "policy.Conditional_ConsistencyFM.eps": 1.0,
-    "policy.Conditional_ConsistencyFM.delta": 0.01,
-    "n_action_steps": 8,
-    "n_obs_steps": 8
-  },
-  {
-    "training.num_epochs": 5000,
-    "optimizer.lr": 1e-05,
-    "dataloader.batch_size": 512,
-    "policy.Conditional_ConsistencyFM.num_segments": 4,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 0.001,
-    "n_action_steps": 6,
-    "n_obs_steps": 6
-  },
-  {
-    "training.num_epochs": 500,
-    "optimizer.lr": 0.001,
-    "dataloader.batch_size": 256,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.01,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 4,
-    "n_obs_steps": 4
-  },
-  {
-    "training.num_epochs": 500,
-    "optimizer.lr": 0.0001,
-    "dataloader.batch_size": 64,
-    "policy.Conditional_ConsistencyFM.num_segments": 1,
-    "policy.Conditional_ConsistencyFM.eps": 0.001,
-    "policy.Conditional_ConsistencyFM.delta": 1.0,
-    "n_action_steps": 2,
-    "n_obs_steps": 6
+    "n_obs_steps": 8,
+    "policy.diffusion_step_embed_dim": 1024,
+    "_state_mlp_hidden": 512,
+    "_unet_base_width": 256
   }
 ]
