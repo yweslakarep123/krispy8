@@ -1,0 +1,64 @@
+Epochs:  67%|███████████▎     | 1999/3000 [24:05<09:48,  1.70it/s, train=0.0000][34m[1mwandb[0m: [38;5;178m⢿[0m Encoding video...                                                                     [34m[1mwandb[0m: [38;5;178m⢿[0m Encoding video...
+                                                                                                                                                                                                           
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0375[0m
+[32mmean completed tasks per ep: 0.15 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1250[0m
+[32mmean completed tasks per ep: 0.50 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0750[0m
+[32mmean completed tasks per ep: 0.30 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1375[0m
+[32mmean completed tasks per ep: 0.55 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1500[0m
+[32mmean completed tasks per ep: 0.60 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2500[0m
+[32mmean completed tasks per ep: 1.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1750[0m
+[32mmean completed tasks per ep: 0.70 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1875[0m
+[32mmean completed tasks per ep: 0.75 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2625[0m
+[32mmean completed tasks per ep: 1.05 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.3125[0m
+[32mmean completed tasks per ep: 1.25 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1500[0m
+[32mmean completed tasks per ep: 0.60 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1500[0m
+[32mmean completed tasks per ep: 0.60 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2750[0m
+[32mmean completed tasks per ep: 1.10 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2625[0m
+[32mmean completed tasks per ep: 1.05 / 4[0m
+[35mResuming from checkpoint /home/daffa/Documents/krispy8/data/outputs/kitchen_complete-flowpolicy_seed0_raw__20260504_050527_d1be9314/checkpoints/latest.ckpt[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2625[0m
+[32mmean completed tasks per ep: 1.05 / 4[0m
+[35m---------------- Eval Results --------------[0m
+[35mmean_n_completed_tasks: 1.0500[0m
+[35mmean_success_rates: 0.2625[0m
+[35mtest_mean_score: 0.2625[0m
+[35mmean_time: 0.0066[0m
+[35mmean_inference_latency_ms: 6.6072[0m
+[35mstd_inference_latency_ms: 0.0338[0m
+[35msuccess_rate_k1: 0.6500[0m
+[35msuccess_rate_k2: 0.4000[0m
+[35msuccess_rate_k3: 0.0000[0m
+[35msuccess_rate_k4: 0.0000[0m
+[35mSR_test_L3: 0.2625[0m
+[35mSR_test_L5: 0.2625[0m

@@ -6,13 +6,17 @@ from flow_policy_3d.common.replay_buffer import ReplayBuffer
 
 @numba.jit(nopython=True)
 def create_indices(
-    episode_ends:np.ndarray, sequence_length:int, 
+    episode_ends:np.ndarray, sequence_length:int,
     episode_mask: np.ndarray,
     pad_before: int=0, pad_after: int=0,
+    sequence_stride: int=1,
     debug:bool=True) -> np.ndarray:
-    episode_mask.shape == episode_ends.shape        
+    episode_mask.shape == episode_ends.shape
     pad_before = min(max(pad_before, 0), sequence_length-1)
     pad_after = min(max(pad_after, 0), sequence_length-1)
+    stride = sequence_stride
+    if stride < 1:
+        stride = 1
 
     indices = list()
     for i in range(len(episode_ends)):
@@ -24,12 +28,12 @@ def create_indices(
             start_idx = episode_ends[i-1]
         end_idx = episode_ends[i]
         episode_length = end_idx - start_idx
-        
+
         min_start = -pad_before
         max_start = episode_length - sequence_length + pad_after
-        
-        # range stops one idx before end
-        for idx in range(min_start, max_start+1):
+
+        # stride=1: sliding window (overlap). stride=sequence_length: no overlap.
+        for idx in range(min_start, max_start+1, stride):
             buffer_start_idx = max(idx, 0) + start_idx
             buffer_end_idx = min(idx+sequence_length, episode_length) + start_idx
             start_offset = buffer_start_idx - (idx+start_idx)
@@ -75,43 +79,51 @@ def downsample_mask(mask, max_n, seed=0):
     return train_mask
 
 class SequenceSampler:
-    def __init__(self, 
-        replay_buffer: ReplayBuffer, 
+    def __init__(self,
+        replay_buffer: ReplayBuffer,
         sequence_length:int,
         pad_before:int=0,
         pad_after:int=0,
         keys=None,
         key_first_k=dict(),
         episode_mask: Optional[np.ndarray]=None,
+        sequence_stride: int = 1,
         ):
         """
         key_first_k: dict str: int
             Only take first k data from these keys (to improve perf)
+
+        sequence_stride:
+            Step between window start indices inside each episode (default 1 =
+            full sliding window). Set to ``sequence_length`` for disjoint
+            windows only (no overlap / no sliding).
         """
 
         super().__init__()
         assert(sequence_length >= 1)
         if keys is None:
             keys = list(replay_buffer.keys())
-        
+
         episode_ends = replay_buffer.episode_ends[:]
         if episode_mask is None:
             episode_mask = np.ones(episode_ends.shape, dtype=bool)
 
         if np.any(episode_mask):
-            indices = create_indices(episode_ends, 
-                sequence_length=sequence_length, 
-                pad_before=pad_before, 
+            indices = create_indices(episode_ends,
+                sequence_length=sequence_length,
+                pad_before=pad_before,
                 pad_after=pad_after,
-                episode_mask=episode_mask
+                episode_mask=episode_mask,
+                sequence_stride=sequence_stride,
                 )
         else:
             indices = np.zeros((0,4), dtype=np.int64)
 
         # (buffer_start_idx, buffer_end_idx, sample_start_idx, sample_end_idx)
-        self.indices = indices 
+        self.indices = indices
         self.keys = list(keys) # prevent OmegaConf list performance problem
         self.sequence_length = sequence_length
+        self.sequence_stride = max(1, int(sequence_stride))
         self.replay_buffer = replay_buffer
         self.key_first_k = key_first_k
     

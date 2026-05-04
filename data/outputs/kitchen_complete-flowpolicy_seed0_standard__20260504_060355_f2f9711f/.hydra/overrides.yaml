@@ -1,0 +1,12 @@
+- task=kitchen_complete
+- task.dataset.preprocessing_profile=standard
+- training.resume=false
+- training.debug=FALSE
+- training.seed=0
+- training.device=cuda
+- exp_name=kitchen_complete-flowpolicy
+- logging.name=kitchen_complete-flowpolicy_seed0_standard__20260504_060355_f2f9711f
+- logging.mode=online
+- logging.resume=false
+- logging.id=6ebec94d704af9567f947cee9ac25727
+- checkpoint.save_ckpt=True

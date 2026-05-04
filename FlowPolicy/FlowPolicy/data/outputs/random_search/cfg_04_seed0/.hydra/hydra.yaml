@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
+    dir: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
   sweep:
     dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
     subdir: ${hydra.job.num}
@@ -110,7 +110,7 @@ hydra:
   output_subdir: .hydra
   overrides:
     hydra:
-    - hydra.run.dir=/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
+    - hydra.run.dir=/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
     - hydra.mode=RUN
     task:
     - task=kitchen_complete
@@ -121,19 +121,22 @@ hydra:
     - logging.name=random_search_cfg_04_seed0
     - logging.mode=offline
     - checkpoint.save_ckpt=True
-    - training.num_epochs=3000
-    - optimizer.lr=1e-05
+    - training.num_epochs=500
+    - optimizer.lr=0.0005
     - dataloader.batch_size=256
     - val_dataloader.batch_size=256
     - policy.Conditional_ConsistencyFM.num_segments=1
-    - policy.Conditional_ConsistencyFM.eps=1
-    - policy.Conditional_ConsistencyFM.delta=0.01
+    - policy.Conditional_ConsistencyFM.eps=0.001
+    - policy.Conditional_ConsistencyFM.delta=0.0001
     - n_action_steps=8
-    - n_obs_steps=4
+    - n_obs_steps=8
+    - policy.diffusion_step_embed_dim=1024
+    - policy.state_mlp_size=[512,512]
+    - policy.down_dims=[256,512,1024]
   job:
     name: train
     chdir: null
-    override_dirname: checkpoint.save_ckpt=True,dataloader.batch_size=256,exp_name=random_search,logging.mode=offline,logging.name=random_search_cfg_04_seed0,n_action_steps=8,n_obs_steps=4,optimizer.lr=1e-05,policy.Conditional_ConsistencyFM.delta=0.01,policy.Conditional_ConsistencyFM.eps=1,policy.Conditional_ConsistencyFM.num_segments=1,task=kitchen_complete,training.debug=False,training.device=cuda,training.num_epochs=3000,training.seed=0,val_dataloader.batch_size=256
+    override_dirname: checkpoint.save_ckpt=True,dataloader.batch_size=256,exp_name=random_search,logging.mode=offline,logging.name=random_search_cfg_04_seed0,n_action_steps=8,n_obs_steps=8,optimizer.lr=0.0005,policy.Conditional_ConsistencyFM.delta=0.0001,policy.Conditional_ConsistencyFM.eps=0.001,policy.Conditional_ConsistencyFM.num_segments=1,policy.diffusion_step_embed_dim=1024,policy.down_dims=[256,512,1024],policy.state_mlp_size=[512,512],task=kitchen_complete,training.debug=False,training.device=cuda,training.num_epochs=500,training.seed=0,val_dataloader.batch_size=256
     id: ???
     num: ???
     config_name: flowpolicy
@@ -147,18 +150,18 @@ hydra:
   runtime:
     version: 1.3.2
     version_base: '1.3'
-    cwd: /home/daffa/Documents/skpsi
+    cwd: /home/daffa/Documents/krispy8
     config_sources:
     - path: hydra.conf
       schema: pkg
       provider: hydra
-    - path: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/flow_policy_3d/config
+    - path: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/config
       schema: file
       provider: main
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
+    output_dir: /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_04_seed0
     choices:
       task: kitchen_complete
       hydra/env: default

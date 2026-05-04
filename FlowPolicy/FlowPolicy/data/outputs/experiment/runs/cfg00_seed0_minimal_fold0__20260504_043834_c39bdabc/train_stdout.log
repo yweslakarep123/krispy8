@@ -1,0 +1,202 @@
+[LowdimEncoder] state_dim=70 out_channel=64 hidden_dims=(1024, 1024)
+[2026-05-04 04:38:37,125][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 7.466753e+07
+----------------------------------
+Class name: FlowPolicyLowdim
+  Number of parameters: 75.8595M
+   _dummy_variable: 0.0000M (0.00%)
+   obs_encoder: 1.1920M (1.57%)
+   model: 74.6675M (98.43%)
+   mask_generator: 0.0000M (0.00%)
+----------------------------------
+[KitchenDataset] preprocessing_profile=minimal: sliding stride 1, no Gaussian augmentation
+[KitchenDataset] loading minari dataset 'D4RL/kitchen/complete-v2'
+[KitchenDataset] loaded 19 episodes, 4209 total steps
+[KitchenDataset] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+[KitchenDataset] order filter: tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'], skipped=0 episode(s) not matching order
+[KitchenDataset] agent_pos_dim=70 action_dim=9 robot_obs_dim(for noise)=59
+
+========================================================================
+ KONFIGURASI RUN (training ini)
+========================================================================
+  output_dir ........................ /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0__20260504_043834_c39bdabc
+  exp_name .......................... experiment_cv
+  training.seed / device ............ 0 / cuda
+  training.resume / debug ......... False / False
+  training.num_epochs ............... 5000
+  training.use_ema .................. True
+  optimizer.lr ...................... 1e-05
+  dataloader.batch_size ............. 128
+  n_obs_steps / n_action_steps ...... 4 / 4
+  horizon ........................... 8
+  task.dataset.preprocessing_profile  minimal
+  task.dataset.val_ratio ............ 0.02
+  task.dataset.train_episode_indices  [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15]
+  task.dataset.val_episode_indices .. [6, 12, 17, 18]
+  |train dataset| / |val dataset| ... 3090 / 887
+  |train batches| / |val batches| ... 25 / 7
+  policy.Conditional_ConsistencyFM .. alpha=1e-05, boundary=1, delta=0.001, eps=0.001, num_inference_step=1, num_segments=2
+========================================================================
+
+[2026-05-04 04:38:37,956][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+AdroitHandRelocateDense-v1, AdroitHandHammerDense-v1, AdroitHandDoorDense-v1 environment's reward functions were updated in v1.2.1 without an environment version update. Therefore, use gymnasium-robotics==1.2.0 for v1 reproducibility or use v2 in gymnasium-robotics>=1.4.3. See https://github.com/Farama-Foundation/Gymnasium-Robotics/pull/220 for more details
+-----------------------------
+[WandB] group: experiment_cv
+[WandB] name: exp_cfg00_seed0_minimal_fold0__20260504_043834_c39bdabc
+-----------------------------
+wandb: Tracking run with wandb version 0.26.1
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0__20260504_043834_c39bdabc/wandb/offline-run-20260504_043838-7d2763c72d994b96bd3bc40d79ae21b6
+Epochs:   0%|          | 0/5000 [00:00<?, ?it/s]
+Training epoch 0:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 0:  24%|██▍       | 6/25 [00:01<00:03,  5.77it/s, loss=3.22e-6][A
+Training epoch 0:  64%|██████▍   | 16/25 [00:02<00:01,  7.88it/s, loss=3.34e-6][A
+                                                                               [A
+Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s][A[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
+
+Eval FrankaKitchen-v1 [kitchen_complete]:  20%|██        | 4/20 [00:05<00:20,  1.26s/it][A
+Eval FrankaKitchen-v1 [kitchen_complete]:  45%|████▌     | 9/20 [00:10<00:12,  1.16s/it][A
+Eval FrankaKitchen-v1 [kitchen_complete]:  70%|███████   | 14/20 [00:16<00:06,  1.14s/it][A
+Eval FrankaKitchen-v1 [kitchen_complete]:  95%|█████████▌| 19/20 [00:21<00:01,  1.13s/it][A
+                                                                                         [Atest_mean_score (kitchen success frac): 0.0000
+mean completed tasks per ep: 0.00 / 4
+wandb: Encoding video...
+Epochs:   0%|          | 1/5000 [00:28<39:53:32, 28.73s/it, train=0.0000]
+Training epoch 1:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 1:  36%|███▌      | 9/25 [00:01<00:01,  8.50it/s, loss=3.12e-6][A
+Training epoch 1:  76%|███████▌  | 19/25 [00:02<00:00,  8.92it/s, loss=2.86e-6][A
+                                                                               [AEpochs:   0%|          | 2/5000 [00:31<18:42:13, 13.47s/it, train=0.0000]
+Training epoch 2:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 2:  36%|███▌      | 9/25 [00:01<00:01,  8.68it/s, loss=2.29e-6][A
+Training epoch 2:  76%|███████▌  | 19/25 [00:02<00:00,  9.01it/s, loss=2.11e-6][A
+                                                                               [AEpochs:   0%|          | 3/5000 [00:34<11:54:39,  8.58s/it, train=0.0000]
+Training epoch 3:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 3:  36%|███▌      | 9/25 [00:01<00:01,  8.66it/s, loss=1.87e-6][A
+Training epoch 3:  76%|███████▌  | 19/25 [00:02<00:00,  8.98it/s, loss=1.7e-6][A
+                                                                              [AEpochs:   0%|          | 4/5000 [00:37<8:43:20,  6.29s/it, train=0.0000] 
+Training epoch 4:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 4:  36%|███▌      | 9/25 [00:01<00:01,  8.59it/s, loss=1.65e-6][A
+Training epoch 4:  76%|███████▌  | 19/25 [00:02<00:00,  8.92it/s, loss=1.58e-6][A
+                                                                               [AEpochs:   0%|          | 5/5000 [00:39<6:58:16,  5.02s/it, train=0.0000]
+Training epoch 5:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 5:  36%|███▌      | 9/25 [00:01<00:01,  8.56it/s, loss=1.51e-6][A
+Training epoch 5:  76%|███████▌  | 19/25 [00:02<00:00,  8.89it/s, loss=1.41e-6][A
+                                                                               [AEpochs:   0%|          | 6/5000 [00:42<5:55:31,  4.27s/it, train=0.0000]
+Training epoch 6:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 6:  36%|███▌      | 9/25 [00:01<00:01,  8.55it/s, loss=1.43e-6][A
+Training epoch 6:  76%|███████▌  | 19/25 [00:02<00:00,  8.86it/s, loss=1.35e-6][A
+                                                                               [AEpochs:   0%|          | 7/5000 [00:45<5:15:38,  3.79s/it, train=0.0000]
+Training epoch 7:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 7:  36%|███▌      | 9/25 [00:01<00:01,  8.47it/s, loss=1.27e-6][A
+Training epoch 7:  76%|███████▌  | 19/25 [00:02<00:00,  8.80it/s, loss=1.32e-6][A
+                                                                               [AEpochs:   0%|          | 8/5000 [00:48<4:49:50,  3.48s/it, train=0.0000]
+Training epoch 8:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 8:  36%|███▌      | 9/25 [00:01<00:01,  8.46it/s, loss=1.27e-6][A
+Training epoch 8:  72%|███████▏  | 18/25 [00:02<00:00,  8.77it/s, loss=1.26e-6][A
+                                                                               [AEpochs:   0%|          | 9/5000 [00:51<4:32:54,  3.28s/it, train=0.0000]
+Training epoch 9:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 9:  36%|███▌      | 9/25 [00:01<00:01,  8.48it/s, loss=1.27e-6][A
+Training epoch 9:  72%|███████▏  | 18/25 [00:02<00:00,  8.77it/s, loss=1.26e-6][A
+                                                                               [AEpochs:   0%|          | 10/5000 [00:53<4:21:19,  3.14s/it, train=0.0000]
+Training epoch 10:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 10:  36%|███▌      | 9/25 [00:01<00:01,  8.41it/s, loss=1.23e-6][A
+Training epoch 10:  72%|███████▏  | 18/25 [00:02<00:00,  8.74it/s, loss=1.22e-6][A
+                                                                                [AEpochs:   0%|          | 11/5000 [00:56<4:13:50,  3.05s/it, train=0.0000]
+Training epoch 11:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 11:  36%|███▌      | 9/25 [00:01<00:01,  8.45it/s, loss=1.22e-6][A
+Training epoch 11:  72%|███████▏  | 18/25 [00:02<00:00,  8.73it/s, loss=1.2e-6][A
+                                                                               [AEpochs:   0%|          | 12/5000 [00:59<4:08:27,  2.99s/it, train=0.0000]
+Training epoch 12:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 12:  36%|███▌      | 9/25 [00:01<00:01,  8.40it/s, loss=1.22e-6][A
+Training epoch 12:  72%|███████▏  | 18/25 [00:02<00:00,  8.71it/s, loss=1.21e-6][A
+                                                                                [AEpochs:   0%|          | 13/5000 [01:02<4:04:56,  2.95s/it, train=0.0000]
+Training epoch 13:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 13:  36%|███▌      | 9/25 [00:01<00:01,  8.40it/s, loss=1.22e-6][A
+Training epoch 13:  72%|███████▏  | 18/25 [00:02<00:00,  8.70it/s, loss=1.18e-6][A
+                                                                                [AEpochs:   0%|          | 14/5000 [01:05<4:02:34,  2.92s/it, train=0.0000]
+Training epoch 14:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 14:  36%|███▌      | 9/25 [00:01<00:01,  8.37it/s, loss=1.17e-6][A
+Training epoch 14:  72%|███████▏  | 18/25 [00:02<00:00,  8.66it/s, loss=1.2e-6][A
+                                                                               [AEpochs:   0%|          | 15/5000 [01:08<4:01:12,  2.90s/it, train=0.0000]
+Training epoch 15:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 15:  36%|███▌      | 9/25 [00:01<00:01,  8.38it/s, loss=1.15e-6][A
+Training epoch 15:  72%|███████▏  | 18/25 [00:02<00:00,  8.69it/s, loss=1.19e-6][A
+                                                                                [AEpochs:   0%|          | 16/5000 [01:11<4:00:15,  2.89s/it, train=0.0000]
+Training epoch 16:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 16:  36%|███▌      | 9/25 [00:01<00:01,  8.36it/s, loss=1.18e-6][A
+Training epoch 16:  72%|███████▏  | 18/25 [00:02<00:00,  8.66it/s, loss=1.16e-6][A
+                                                                                [AEpochs:   0%|          | 17/5000 [01:13<3:59:31,  2.88s/it, train=0.0000]
+Training epoch 17:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 17:  36%|███▌      | 9/25 [00:01<00:01,  8.30it/s, loss=1.2e-6][A
+Training epoch 17:  72%|███████▏  | 18/25 [00:02<00:00,  8.60it/s, loss=1.18e-6][A
+                                                                                [AEpochs:   0%|          | 18/5000 [01:16<3:59:24,  2.88s/it, train=0.0000]
+Training epoch 18:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 18:  36%|███▌      | 9/25 [00:01<00:01,  8.30it/s, loss=1.14e-6][A
+Training epoch 18:  72%|███████▏  | 18/25 [00:02<00:00,  8.61it/s, loss=1.16e-6][A
+                                                                                [AEpochs:   0%|          | 19/5000 [01:19<3:59:21,  2.88s/it, train=0.0000]
+Training epoch 19:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 19:  36%|███▌      | 9/25 [00:01<00:01,  8.32it/s, loss=1.18e-6][A
+Training epoch 19:  72%|███████▏  | 18/25 [00:02<00:00,  8.62it/s, loss=1.17e-6][A
+                                                                                [AEpochs:   0%|          | 20/5000 [01:22<3:59:08,  2.88s/it, train=0.0000]
+Training epoch 20:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 20:  36%|███▌      | 9/25 [00:01<00:01,  8.32it/s, loss=1.15e-6][A
+Training epoch 20:  72%|███████▏  | 18/25 [00:02<00:00,  8.61it/s, loss=1.15e-6][A
+                                                                                [AEpochs:   0%|          | 21/5000 [01:25<3:59:25,  2.89s/it, train=0.0000]
+Training epoch 21:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 21:  36%|███▌      | 9/25 [00:01<00:01,  8.32it/s, loss=1.16e-6][A
+Training epoch 21:  72%|███████▏  | 18/25 [00:02<00:00,  8.60it/s, loss=1.19e-6][A
+                                                                                [AEpochs:   0%|          | 22/5000 [01:28<3:59:24,  2.89s/it, train=0.0000]
+Training epoch 22:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 22:  36%|███▌      | 9/25 [00:01<00:01,  8.33it/s, loss=1.15e-6][A
+Training epoch 22:  72%|███████▏  | 18/25 [00:02<00:00,  8.61it/s, loss=1.18e-6][A
+                                                                                [AEpochs:   0%|          | 23/5000 [01:31<3:59:21,  2.89s/it, train=0.0000]
+Training epoch 23:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 23:  36%|███▌      | 9/25 [00:01<00:01,  8.33it/s, loss=1.18e-6][A
+Training epoch 23:  72%|███████▏  | 18/25 [00:02<00:00,  8.59it/s, loss=1.15e-6][A
+                                                                                [AEpochs:   0%|          | 24/5000 [01:34<3:59:13,  2.88s/it, train=0.0000]
+Training epoch 24:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 24:  36%|███▌      | 9/25 [00:01<00:01,  8.33it/s, loss=1.14e-6][A
+Training epoch 24:  72%|███████▏  | 18/25 [00:02<00:00,  8.60it/s, loss=1.15e-6][A
+                                                                                [AEpochs:   0%|          | 25/5000 [01:37<3:59:09,  2.88s/it, train=0.0000]
+Training epoch 25:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 25:  36%|███▌      | 9/25 [00:01<00:01,  8.34it/s, loss=1.17e-6][A
+Training epoch 25:  72%|███████▏  | 18/25 [00:02<00:00,  8.60it/s, loss=1.13e-6][A
+                                                                                [AEpochs:   1%|          | 26/5000 [01:39<3:59:19,  2.89s/it, train=0.0000]
+Training epoch 26:   0%|          | 0/25 [00:00<?, ?it/s][A
+Training epoch 26:  36%|███▌      | 9/25 [00:01<00:01,  8.32it/s, loss=1.14e-6][A
+Training epoch 26:  72%|███████▏  | 18/25 [00:02<00:00,  8.59it/s, loss=1.15e-6][A
+                                                                                [AEpochs:   1%|          | 26/5000 [01:42<5:27:19,  3.95s/it, train=0.0000]
+Traceback (most recent call last):
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 938, in <module>
+    main()
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 935, in main
+    workspace.run()
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 591, in run
+    ema.step(self.model)
+  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/flow_policy_3d/model/flow/ema_model.py", line 84, in step
+    ema_param.add_(param.data.to(dtype=ema_param.dtype), alpha=1 - self.decay)
+KeyboardInterrupt
+[1;34mwandb[0m: 
+[1;34mwandb[0m: You can sync this run to the cloud by running:
+[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0__20260504_043834_c39bdabc/wandb/offline-run-20260504_043838-7d2763c72d994b96bd3bc40d79ae21b6[0m
+[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0__20260504_043834_c39bdabc/wandb/offline-run-20260504_043838-7d2763c72d994b96bd3bc40d79ae21b6/logs[0m

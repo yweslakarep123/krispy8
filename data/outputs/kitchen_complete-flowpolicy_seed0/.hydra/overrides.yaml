@@ -1,7 +1,0 @@
-- task=kitchen_complete
-- training.debug=FALSE
-- training.seed=0
-- training.device=cuda
-- exp_name=kitchen_complete-flowpolicy
-- logging.mode=online
-- checkpoint.save_ckpt=True

@@ -1,101 +1,173 @@
-# FlowPolicy Kitchen - Cara Menjalankan Eksperimen
+# FlowPolicy (low-dim) for Franka Kitchen
 
-Dokumen ini menjelaskan cara menjalankan eksperimen `3 seed x 2 scenario` dengan alur:
-- random search hyperparameter (`n_iter`, `cv`)
-- train final model terbaik per scenario
-- inferensi evaluasi
-- inferensi final untuk global winner
-- generate plot performa
+Low-dim state-based adaptation of [FlowPolicy (AAAI 2025)](https://arxiv.org/abs/2412.04987)
+for the **FrankaKitchen-v1** environment (`gymnasium-robotics`), trained with
+behaviour cloning on the Minari `D4RL/kitchen/complete-v2` dataset.
 
-Scenario yang dijalankan per seed:
-- `tuned_no_preprocess`
-- `tuned_preprocess`
+The consistency flow-matching formulation and `ConditionalUnet1D` backbone of
+the original repo are kept unchanged. All 3D point-cloud / PointNet /
+Metaworld / Adroit code paths, along with the `mujoco-py`, `pytorch3d`,
+`open3d`, and old-`gym` dependencies, have been removed.
 
-## 1) Jalankan dari root repository
+## Observation / action
 
-Pastikan perintah dijalankan dari:
-- `C:/Users/Thinkpad/Downloads/krispy8`
+The policy input is a single low-dim vector per timestep:
 
-## 2) Command utama (sesuai skenario Anda)
-
-Menjalankan eksperimen penuh dengan:
-- seed: `0 42 101`
-- random search: `n_iter=100`
-- cross-validation: `cv=5`
-- simpan video final global winner
-- strict GPU aktif default (akan gagal jika CUDA tidak tersedia)
-
-```bash
-py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 42 101 --random-n-iter 100 --random-cv 5 --hero-video
+```
+agent_pos_t = concat(obs_dict['observation'],
+                     flatten(obs_dict['desired_goal']))
 ```
 
-Jika ingin mengizinkan fallback CPU (tidak disarankan):
+with the `desired_goal` dict flattened in **alphabetical key order** so the
+same layout is used during training (Minari) and rollout (`gymnasium`).
+
+For `tasks_to_complete = [microwave, kettle, light switch, slide cabinet]`:
+
+| piece              | dim |
+|--------------------|-----|
+| `observation`      |  59 |
+| `desired_goal`     |  11 (kettle 7 + light switch 2 + microwave 1 + slide cabinet 1) |
+| **agent_pos**      |  **70** |
+| action             |   9 (Box[-1, 1]) |
+
+## Installation
+
+See [install.md](install.md).
+
+## Training
 
 ```bash
-py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 42 101 --random-n-iter 100 --random-cv 5 --hero-video --no-strict-gpu
+bash scripts/train_kitchen.sh 0 0        # seed 0, GPU 0 (profil default: standard)
 ```
 
-## 3) Opsi cepat untuk pengecekan alur (dry-run)
+Setiap kali skrip dijalankan, keluaran ditulis ke folder **baru** (tidak menimpa run lama), dengan pola:
 
-Tidak menjalankan training/inferensi sungguhan, hanya validasi urutan command:
+`FlowPolicy/data/outputs/kitchen_complete-flowpolicy_seed<N>_<profil>__<YYYYMMDD_HHMMSS>_<random>/`
+
+Di terminal akan tercetak waktu mulai (ISO), hostname, GPU, `run_slug`, dan `output_dir`. Training memakai `training.resume=false` dan run WandB tidak dilanjutkan (`logging.resume=false` + id unik).
+
+Under the hood this runs:
 
 ```bash
-py -3 FlowPolicy/scripts/experiment_3seed_4arms.py --seeds 0 --random-n-iter 2 --random-cv 2 --eval-episodes 2 --hero-episodes 2 --dry-run
+python FlowPolicy/train.py --config-name=flowpolicy task=kitchen_complete ...
 ```
 
-## 4) Arti output yang dihasilkan
+Logs are pushed to Weights & Biases (project `flowpolicy_kitchen`).
 
-Default output ada di:
-- `FlowPolicy/FlowPolicy/data/outputs/exp_3seed_4arms`
+## Urutan workflow (train dulu, lalu eksperimen)
 
-File penting:
-- `all_models_eval.csv`: hasil evaluasi semua scenario/model lintas seed
-- `seed_winners.json`: pemenang per seed
-- `global_winner.json`: model terbaik global
-- `final_summary.json`: ringkasan inferensi final global winner
-- `plot_summary.json`: ringkasan path file plot
+Urutan yang Anda maksud — dari **tanpa preprocessing** (`raw`) ke **dengan preprocessing** (`standard`). Ganti `0` di akhir perintah pertama bila GPU bukan 0. Semua perintah dari folder **`FlowPolicy`**.
 
-Plot yang dibuat:
-- `plots/success_rate_all_models.png`
-- `plots/global_winner_sr_latency.png`
-
-## 5) Script yang dipakai di balik orkestrasi
-
-- `FlowPolicy/scripts/random_search_kitchen.py`
-  - random search per seed/mode preprocess
-  - output utama: `results.csv` dan `best_trial.json`
-- `FlowPolicy/scripts/train_best_from_random.py`
-  - training model final dari `best_trial.json`
-- `FlowPolicy/scripts/experiment_3seed_4arms.py`
-  - orkestrasi end-to-end + plotting
-  - menampilkan progress `[progress] ...` saat run
-
-## 6) Monitoring progress saat run
-
-Saat eksperimen berjalan, terminal menampilkan progres seperti:
-- `[progress] 3/22 (13.6%) - seed0 scenario=tuned_no_preprocess train_best`
-- `[random_search][progress] 12/500 (2.4%) cfg=3/100 cv=2/5`
-
-Artinya:
-- progress orkestrasi global (seed/scenario/eval/final)
-- progress detail random search (kandidat dan fold CV yang sedang diproses)
-
-## 7) GPU mode dan verifikasi
-
-Script sekarang memaksa mode GPU dan optimasi performa:
-- set `training.device=cuda`
-- `strict GPU`: stop jika CUDA tidak tersedia
-- `FLOWP_GPU_PERF_MODE=1` mengaktifkan:
-  - `torch.backends.cudnn.benchmark=True`
-  - `torch.backends.cuda.matmul.allow_tf32=True`
-  - `torch.backends.cudnn.allow_tf32=True`
-
-Verifikasi saat run:
-- akan muncul log `[gpu-check] CUDA ready ...`
-- monitor utilitas GPU dengan:
+1. **Training kitchen, tanpa preprocessing** (`raw` — stride horizon, tanpa noise, tanpa holdout val acak bila tanpa indeks CV):
 
 ```bash
-nvidia-smi -l 1
+cd FlowPolicy
+bash scripts/train_kitchen.sh 0 0 FALSE True raw
+```
+
+2. **Training kitchen, dengan preprocessing** (`standard` — sliding + augmentasi default):
+
+```bash
+bash scripts/train_kitchen.sh 0 0 FALSE True standard
+```
+
+3. **Eksperimen CV (orkestrator), tanpa preprocessing** — hanya profil `raw`; keluaran terpisah agar mudah dibandingkan:
+
+```bash
+bash scripts/run_experiment.sh 0 --profiles raw --output-dir data/outputs/experiment_raw
+```
+
+4. **Eksperimen CV, dengan preprocessing** — hanya profil `standard`:
+
+```bash
+bash scripts/run_experiment.sh 0 --profiles standard --output-dir data/outputs/experiment_standard
+```
+
+**Catatan:** `train_kitchen` setiap kali membuat folder output **baru** (timestamp di nama folder). `run_experiment` memakai `--output-dir` berbeda di langkah 3 vs 4 supaya `results.csv` / `runs/` tidak tercampur; jika memakai `--output-dir` yang sama, tetap aman karena nama sel berbeda (`..._raw_...` vs `..._standard_...`), tetapi dua file ringkasan terpisah biasanya lebih rapi.
+
+## Evaluation
+
+```bash
+bash scripts/eval_kitchen.sh 0 0
+```
+
+The evaluation runner instantiates FrankaKitchen-v1 via `gymnasium.make`,
+computes the fraction of `tasks_to_complete` completed per episode (averaged
+over `eval_episodes`), and (optionally) logs a few rollout videos.
+
+## Urutan sub-task & filter demonstrasi
+
+Task yaml (`FlowPolicy/flow_policy_3d/config/task/kitchen_complete.yaml`)
+mendefinisikan `tasks_to_complete` dengan urutan:
+
+```
+[microwave, kettle, light switch, slide cabinet]
+```
+
+Urutan ini dipakai di dua tempat:
+
+1. **Layout vektor goal** pada `agent_pos`. `KitchenDataset` dan
+   `KitchenRunner` sama-sama memakai urutan ini (bukan alfabetis seperti
+   versi sebelumnya) agar komposisi `agent_pos_t` di training dan rollout
+   konsisten.
+2. **Filter demonstrasi**. Hanya episode yang menyelesaikan keempat task
+   persis dalam urutan di atas yang dipakai untuk training. Set
+   `dataset.enforce_task_order=false` untuk menonaktifkan.
+
+## Augmentasi data (generalisasi)
+
+Untuk mencegah model menghafal trajektori, tersedia dua augmentasi (hanya
+diterapkan pada split training):
+
+| yaml field                   | default | keterangan                                   |
+|------------------------------|---------|----------------------------------------------|
+| `dataset.obs_noise_std`      | `0.01`  | Gaussian noise di 59 dim observation state   |
+| `dataset.action_noise_std`   | `0.0`   | Gaussian noise pada target action            |
+| `dataset.normalizer_mode`    | `limits`| `limits` atau `gaussian`                     |
+
+Override via Hydra, mis. `task.dataset.obs_noise_std=0.02`.
+
+## Profil preprocessing (`task.dataset.preprocessing_profile`)
+
+| Profil | Sliding (stride) | Noise | Split train/val |
+|--------|------------------|-------|------------------|
+| `standard` | 1 (overlap) | ya (default yaml) | `val_ratio` atau indeks CV |
+| `minimal` | 1 (overlap) | tidak | idem |
+| `raw` | `horizon` (tanpa overlap) | tidak | tanpa holdout acak jika **tanpa** indeks episode; dengan indeks CV, split mengikuti daftar itu |
+| `legacy_minimal` | `horizon` | tidak | `val_ratio=0` saja; **tidak** kompatibel dengan indeks episode eksplisit |
+
+Eksperimen hanya jalur “tanpa preprocessing” (artian di atas):  
+`bash scripts/run_experiment.sh 0 --profiles raw`
+
+## OFAT hyperparameter sweep (8 HP x 4 nilai x 3 seed = 96 run)
+
+Skrip `scripts/ofat_search_kitchen.py` meng-eksplorasi **setiap** hyperparameter
+satu per satu (One-Factor-At-a-Time), menahan yang lain di nilai baseline.
+
+Baseline:
+
+| hyperparameter                                  | baseline |
+|-------------------------------------------------|----------|
+| `training.num_epochs`                           | 3000     |
+| `optimizer.lr`                                  | 1e-4     |
+| `dataloader.batch_size`                         | 128      |
+| `policy.Conditional_ConsistencyFM.num_segments` | 2        |
+| `policy.Conditional_ConsistencyFM.eps`          | 1e-2     |
+| `policy.Conditional_ConsistencyFM.delta`        | 1e-2     |
+| `n_action_steps`                                | 4        |
+| `n_obs_steps`                                   | 4        |
+
+Untuk tiap hyperparameter, 4 nilai dari ruang sampling dijalankan (total 32
+konfigurasi), tiap konfigurasi di 3 seed `[0, 42, 101]`, evaluasi 50 episode.
+
+Menjalankan:
+
+```bash
+cd FlowPolicy
+bash scripts/ofat_search_kitchen.sh 0 --dry-run          # cek 32 konfigurasi
+bash scripts/ofat_search_kitchen.sh 0                    # full sweep di GPU 0
+bash scripts/ofat_search_kitchen.sh 0 --only-hp optimizer.lr   # hanya sweep lr
+bash scripts/ofat_search_kitchen.sh 0 --max-minutes 600   # stop setelah 10 jam (Colab T4)
 ```
 
 Keluaran di `data/outputs/ofat_search/`:
@@ -177,33 +249,33 @@ python infer_kitchen.py \
 
 ## Random search hyperparameter (alternatif)
 
-Skrip `scripts/random_search_kitchen.py` melakukan random search yang
-**sekaligus men-train model** untuk setiap kombinasi `(cfg_idx, seed)`,
-kemudian langsung inferensi/evaluasi.
-
-Default: 30 konfigurasi acak × 3 seed `[0, 42, 101]`, evaluasi 50 episode
-per run.
+Skrip `scripts/random_search_kitchen.py` melakukan random search pada **11**
+hyperparameter (sesuai `flowpolicy_hyperparameter_finetuning.md` §2), 30
+konfigurasi acak × 3 seed `[0, 42, 101]`, dengan evaluasi akhir 50 episode
+per run. Ringkasan bisa diurutkan menurut **success rate** atau **trade-off**
+(`--sort-by`).
 
 Ruang sampling:
 
 | hyperparameter                                   | nilai                                |
 |--------------------------------------------------|--------------------------------------|
-| `training.num_epochs`                            | `[500, 1000, 3000, 5000]`            |
-| `optimizer.lr`                                   | `[1e-5, 1e-4, 5e-4, 1e-3]`           |
-| `dataloader.batch_size`                          | `[64, 128, 256, 512]`                |
-| `training.lr_warmup_steps`                       | `[200, 500, 1000, 2000]`             |
-| `training.ema_decay`                             | `[0.90, 0.95, 0.99, 0.999]`          |
-| `policy.encoder_output_dim`                      | `[32, 64, 128, 256]`                 |
+| `training.num_epochs`                          | `[500, 1000, 3000, 5000]`            |
+| `optimizer.lr`                                 | `[1e-3, 5e-4, 1e-4, 1e-5]`           |
+| `dataloader.batch_size`                        | `[64, 128, 256, 512]`                |
 | `policy.Conditional_ConsistencyFM.num_segments`  | `[1, 2, 3, 4]`                       |
-| `policy.Conditional_ConsistencyFM.boundary`      | `[0.5, 1.0, 2.0, 4.0]`               |
-| `policy.Conditional_ConsistencyFM.delta`         | `[1e-3, 1e-2, 1e-1, 1.0]`            |
-| `policy.Conditional_ConsistencyFM.alpha`         | `[1e-6, 1e-5, 1e-4, 1e-3]`           |
-| `policy.Conditional_ConsistencyFM.eps`           | `[1e-4, 1e-3, 1e-2, 1e-1]`           |
-| `policy.Conditional_ConsistencyFM.num_inference_step` | `[1, 2, 3, 5]`                 |
-| `n_action_steps`                                 | `[2, 4, 6, 8]`                       |
-| `n_obs_steps`                                    | `[4, 6, 8, 16]`                      |
+| `policy.Conditional_ConsistencyFM.eps`         | `[1e-4, 1e-3, 1e-2, 1.0]`            |
+| `policy.Conditional_ConsistencyFM.delta`       | `[1e-4, 1e-3, 1e-2, 1.0]`            |
+| `n_action_steps`                               | `[2, 4, 6, 8]`                       |
+| `n_obs_steps`                                  | `[4, 6, 8, 16]`                      |
+| `policy.diffusion_step_embed_dim`              | `[128, 256, 512, 1024]`              |
+| `_state_mlp_hidden` → `policy.state_mlp_size`  | `[128, 256, 512, 1024]` (dua layer)  |
+| `_unet_base_width` → `policy.down_dims`        | `[b, min(2b,1024), min(4b,1024)]`    |
 
-`horizon` dihitung otomatis sebagai `max(n_obs_steps + n_action_steps - 1, 4)`.
+Metrik inferensi menyertakan **`trade_off`** = `test_mean_score / mean_time`
+(lihat `infer_kitchen.py`).
+
+`horizon` dihitung otomatis dari `n_obs_steps` dan `n_action_steps` (lihat
+`flowpolicy.yaml`).
 
 Menjalankan:
 
@@ -214,18 +286,9 @@ bash scripts/random_search_kitchen.sh 0 --dry-run
 
 # eksekusi sebenarnya di GPU 0
 bash scripts/random_search_kitchen.sh 0
-```
 
-Contoh 100 iterasi:
-
-```bash
-cd FlowPolicy
-python scripts/random_search_kitchen.py \
-  --n-configs 100 \
-  --seeds 0 42 101 \
-  --episodes 50 \
-  --sampling-seed 42 \
-  --gpu 0
+# urutkan summary menurut trade-off (bukan success rate)
+bash scripts/random_search_kitchen.sh 0 --sort-by trade_off
 ```
 
 Keluaran di `data/outputs/random_search/`:
@@ -243,24 +306,27 @@ Keluaran di `data/outputs/random_search/`:
 Resume otomatis: jika `metrics.json` untuk `(cfg_idx, seed)` tertentu
 sudah valid, skrip melewatinya.
 
-### Alur setelah tuning
+## Eksperimen CV + multi-seed + profil preprocessing
 
-Tidak perlu retrain terpisah jika checkpoint dari random search sudah ada dan
-valid. Langkah yang disarankan:
-
-1. Pilih `cfg_idx` terbaik dari `summary.csv` (baris teratas, karena sudah
-   diurutkan berdasarkan `test_mean_score_mean`).
-2. Langsung inferensi checkpoint terbaik untuk seed yang diinginkan.
-
-Contoh inferensi dari hasil random search (mis. `cfg_17_seed0`):
+Skrip `scripts/run_experiment.py` (wrapper: `scripts/run_experiment.sh`)
+menyapu **seed × preprocessing × N konfigurasi random (sampling sekali) ×
+K-fold episode**, lalu menulis `results.csv`, `summary.csv`, dan plot di
+`plots/`. Lihat juga `scripts/cv_splits.py` untuk menghasilkan `cv_splits.json`
+mandiri.
 
 ```bash
-cd FlowPolicy/FlowPolicy
-python infer_kitchen.py \
-  --checkpoint data/outputs/random_search/cfg_17_seed0/checkpoints/latest.ckpt \
-  --episodes 50 \
-  --device cuda:0
+cd FlowPolicy
+bash scripts/run_experiment.sh 0 --dry-run
+bash scripts/run_experiment.sh 0 --output-dir data/outputs/experiment \\
+  --n-configs 10 --n-folds 5 --skip-plots   # tanpa matplotlib
 ```
+
+Setiap sel (cfg × seed × profil × fold) menulis ke folder run **unik**
+``runs/<sel>__<YYYYMMDD_HHMMSS>_<uuid8>/``; training **tidak** resume checkpoint
+Hydra dan run WandB **tidak** dilanjutkan (``logging.id`` baru per subproses).
+``summarize.py`` / ``plot_results.py`` mendeduplikasi ``results.csv`` per
+(cfg, profile, fold, seed) memakai **timestamp** terbaru bila Anda mengulang
+eksperimen di ``output-dir`` yang sama.
 
 ## Inferensi (checkpoint → video + metrik)
 
@@ -268,16 +334,20 @@ Setelah training, jalankan inferensi mandiri (tanpa WandB kecuali `--wandb`):
 
 ```bash
 cd FlowPolicy
+# Checkpoint mengikuti folder run terbaru, pola:
+#   .../kitchen_complete-flowpolicy_seed0_standard__20260504_153012_a1b2c3d4/checkpoints/latest.ckpt
+#   .../kitchen_complete-flowpolicy_seed0_minimal__20260504_153045_b2c3d4e5/checkpoints/latest.ckpt
+ls -dt data/outputs/kitchen_complete-flowpolicy_seed0_* | head -1
 python infer_kitchen.py \
-  --checkpoint data/outputs/kitchen_complete-flowpolicy_seed0/checkpoints/latest.ckpt \
+  --checkpoint "$(ls -dt data/outputs/kitchen_complete-flowpolicy_seed0_standard__*/checkpoints/latest.ckpt 2>/dev/null | head -1)" \
   --episodes 10 \
   --device cuda:0
 ```
 
-Atau lewat skrip:
+Atau lewat skrip (ganti path checkpoint ke hasil `ls` / folder run Anda):
 
 ```bash
-bash scripts/infer_kitchen.sh data/outputs/kitchen_complete-flowpolicy_seed0/checkpoints/latest.ckpt 0 10
+bash scripts/infer_kitchen.sh data/outputs/kitchen_complete-flowpolicy_seed0_standard__DATE_TIME_HEX/checkpoints/latest.ckpt 0 10
 ```
 
 Keluaran default: folder `data/outputs/<run>/inference_latest/` berisi:
@@ -336,5 +406,3 @@ and `Consistency_FM`. If you use this code, please cite the original paper:
 ## License
 
 MIT (see [LICENSE](LICENSE)).
-
-Catatan: penggunaan GPU tidak selalu 100% setiap detik karena bisa dibatasi pipeline environment/data loading, tetapi konfigurasi ini memastikan eksekusi utama berjalan di CUDA dan di-tune untuk throughput.

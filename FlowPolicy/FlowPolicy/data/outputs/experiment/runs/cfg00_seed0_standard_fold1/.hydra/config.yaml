@@ -1,0 +1,177 @@
+task:
+  name: kitchen_complete
+  task_name: kitchen_complete
+  tasks_to_complete:
+  - microwave
+  - kettle
+  - light switch
+  - slide cabinet
+  shape_meta:
+    obs:
+      agent_pos:
+        shape:
+        - 70
+        type: low_dim
+    action:
+      shape:
+      - 9
+  env_runner:
+    _target_: flow_policy_3d.env_runner.kitchen_runner.KitchenRunner
+    eval_episodes: 20
+    max_steps: 280
+    n_obs_steps: ${n_obs_steps}
+    n_action_steps: ${n_action_steps}
+    fps: 10
+    task_name: ${task.task_name}
+    tasks_to_complete: ${task.tasks_to_complete}
+    record_video: true
+    max_video_episodes: 2
+    save_videos_dir: null
+    wandb_log: true
+  dataset:
+    _target_: flow_policy_3d.dataset.kitchen_dataset.KitchenDataset
+    dataset_id: D4RL/kitchen/complete-v2
+    preprocessing_profile: standard
+    horizon: ${horizon}
+    pad_before: ${eval:'${n_obs_steps}-1'}
+    pad_after: ${eval:'${n_action_steps}-1'}
+    seed: 42
+    val_ratio: 0.02
+    train_episode_indices:
+    - 0
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 8
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    val_episode_indices:
+    - 3
+    - 7
+    - 9
+    - 10
+    max_train_episodes: null
+    download: true
+    tasks_to_complete: ${task.tasks_to_complete}
+    enforce_task_order: true
+    obs_noise_std: 0.01
+    action_noise_std: 0.0
+    normalizer_mode: limits
+name: train_flowpolicy_lowdim
+task_name: ${task.name}
+shape_meta: ${task.shape_meta}
+exp_name: experiment_cv
+n_obs_steps: 4
+n_action_steps: 4
+horizon: ${eval:'4 * ((max(${n_obs_steps} + ${n_action_steps} - 1, 4) + 3) // 4)'}
+n_latency_steps: 0
+dataset_obs_steps: ${n_obs_steps}
+keypoint_visible_rate: 1.0
+obs_as_global_cond: true
+policy:
+  _target_: flow_policy_3d.policy.flowpolicy_lowdim.FlowPolicyLowdim
+  condition_type: film
+  use_down_condition: true
+  use_mid_condition: true
+  use_up_condition: true
+  diffusion_step_embed_dim: 512
+  down_dims:
+  - 256
+  - 512
+  - 1024
+  encoder_output_dim: 64
+  horizon: ${horizon}
+  kernel_size: 5
+  n_action_steps: ${n_action_steps}
+  n_groups: 8
+  n_obs_steps: ${n_obs_steps}
+  obs_as_global_cond: true
+  shape_meta: ${shape_meta}
+  state_mlp_size:
+  - 1024
+  - 1024
+  encoder_use_layernorm: true
+  action_clip: 1.0
+  Conditional_ConsistencyFM:
+    eps: 0.001
+    num_segments: 2
+    boundary: 1
+    delta: 0.001
+    alpha: 1.0e-05
+    num_inference_step: 1
+ema:
+  _target_: flow_policy_3d.model.flow.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+dataloader:
+  batch_size: 128
+  num_workers: 4
+  shuffle: true
+  pin_memory: true
+  persistent_workers: false
+val_dataloader:
+  batch_size: 128
+  num_workers: 4
+  shuffle: false
+  pin_memory: true
+  persistent_workers: false
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-05
+  betas:
+  - 0.95
+  - 0.999
+  eps: 1.0e-08
+  weight_decay: 1.0e-06
+training:
+  device: cuda
+  seed: 0
+  debug: false
+  resume: true
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 5000
+  gradient_accumulate_every: 1
+  use_ema: true
+  rollout_every: 200
+  checkpoint_every: 200
+  val_every: 1
+  sample_every: 5
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+  max_grad_norm: 1.0
+  ema_decay: 0.95
+logging:
+  group: ${exp_name}
+  id: null
+  mode: offline
+  name: exp_cfg00_seed0_standard_fold1
+  project: flowpolicy_kitchen
+  resume: true
+  tags:
+  - flowpolicy
+  - kitchen
+  - lowdim
+checkpoint:
+  save_ckpt: true
+  topk:
+    monitor_key: test_mean_score
+    mode: max
+    k: 1
+    format_str: epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt
+  save_last_ckpt: true
+  save_last_snapshot: false
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}

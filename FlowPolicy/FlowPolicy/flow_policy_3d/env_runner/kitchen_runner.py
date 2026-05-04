@@ -253,6 +253,18 @@ class KitchenRunner(BaseRunner):
         log_data['mean_success_rates'] = float(np.mean(all_success_fraction))
         log_data['test_mean_score'] = float(np.mean(all_success_fraction))
         log_data['mean_time'] = float(np.mean(all_time))
+        log_data['mean_inference_latency_ms'] = float(np.mean(all_time) * 1000.0)
+        if len(all_time) > 1:
+            log_data['std_inference_latency_ms'] = float(
+                np.std(all_time, ddof=0) * 1000.0)
+        else:
+            log_data['std_inference_latency_ms'] = 0.0
+
+        completed = np.asarray(all_completed_tasks, dtype=np.int32)
+        n_target = max(len(self.tasks_to_complete), 1)
+        for k in range(1, 5):
+            thr = min(k, n_target)
+            log_data[f'success_rate_k{k}'] = float(np.mean(completed >= thr))
 
         cprint(f"test_mean_score (kitchen success frac): "
                f"{log_data['test_mean_score']:.4f}", 'green')
