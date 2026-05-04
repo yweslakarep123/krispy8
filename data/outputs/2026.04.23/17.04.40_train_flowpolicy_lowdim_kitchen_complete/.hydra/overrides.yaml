@@ -1,0 +1,6 @@
+- task=kitchen_complete
+- training.seed=0
+- training.device=cuda
+- exp_name=kitchen_complete-flowpolicy
+- logging.mode=offline
+- +eval.checkpoint_path=/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/checkpoints/latest.ckpt

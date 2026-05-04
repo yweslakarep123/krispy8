@@ -60,6 +60,14 @@ def main():
         help="Jika diset, kirim video ke Weights & Biases (perlu wandb login)",
     )
     parser.add_argument(
+        "--no-video", action="store_true",
+        help="Matikan perekaman video (lebih cepat; hanya hitung SR & latency)."
+    )
+    parser.add_argument(
+        "--strict-gpu", action="store_true",
+        help="Jika diset, gagal jika CUDA tidak tersedia (tidak fallback ke CPU)."
+    )
+    parser.add_argument(
         "--warmup-steps",
         type=int,
         default=20,
@@ -87,8 +95,10 @@ def main():
     else:
         out_dir = run_dir / f"inference_{ckpt_path.stem}"
     out_dir.mkdir(parents=True, exist_ok=True)
+    record_video = not args.no_video
     video_dir = out_dir / "videos"
-    video_dir.mkdir(parents=True, exist_ok=True)
+    if record_video:
+        video_dir.mkdir(parents=True, exist_ok=True)
 
     from train import TrainFlowPolicyWorkspace
 
@@ -99,7 +109,15 @@ def main():
     policy = workspace.ema_model if use_ema and workspace.ema_model is not None else workspace.model
     policy.eval()
 
+    if os.environ.get("FLOWP_GPU_PERF_MODE", "0") == "1" and torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        print("[gpu-perf] enabled: cudnn.benchmark=True, tf32=True")
+
     if args.device.startswith("cuda") and not torch.cuda.is_available():
+        if args.strict_gpu:
+            raise SystemExit("CUDA tidak tersedia, strict GPU aktif. Hentikan proses.")
         device = torch.device("cpu")
         print("CUDA tidak tersedia — memakai CPU.")
     else:
@@ -116,13 +134,13 @@ def main():
                 policy.predict_action({"agent_pos": dummy})
         torch.cuda.synchronize()
 
-    # cfg.task.env_runner dari checkpoint sering struct=True → plain dict.
-    _er = cfg.task.env_runner
-    runner_dict = OmegaConf.to_container(_er, resolve=True)
+    # `cfg.task.env_runner` di checkpoint punya struct=True; konversi ke dict
+    # dulu sebelum menambah override inferensi.
+    runner_dict = OmegaConf.to_container(cfg.task.env_runner, resolve=True)
     runner_dict["eval_episodes"] = args.episodes
-    runner_dict["max_video_episodes"] = args.episodes
-    runner_dict["record_video"] = True
-    runner_dict["save_videos_dir"] = str(video_dir)
+    runner_dict["max_video_episodes"] = args.episodes if record_video else 0
+    runner_dict["record_video"] = record_video
+    runner_dict["save_videos_dir"] = str(video_dir) if record_video else None
     runner_dict["wandb_log"] = bool(args.wandb)
     runner_cfg = OmegaConf.create(runner_dict)
     OmegaConf.set_struct(runner_cfg, False)

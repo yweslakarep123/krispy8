@@ -1,0 +1,20 @@
+{
+  "mean_n_completed_tasks": 0.3,
+  "mean_success_rates": 0.075,
+  "test_mean_score": 0.075,
+  "mean_time": 0.006529184409550258,
+  "SR_test_L3": 0.075,
+  "SR_test_L5": 0.075,
+  "saved_video_paths": [
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_000.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_001.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_002.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_003.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_004.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_005.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_006.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_007.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_008.mp4",
+    "/home/daffa/Documents/krispy8/data/outputs/2026.04.23/17.04.40_train_flowpolicy_lowdim_kitchen_complete/inference_latest/videos/episode_009.mp4"
+  ]
+}

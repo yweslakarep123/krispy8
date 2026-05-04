@@ -1,0 +1,46 @@
+                                                                                
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1250[0m
+[32mmean completed tasks per ep: 0.50 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0000[0m
+[32mmean completed tasks per ep: 0.00 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0375[0m
+[32mmean completed tasks per ep: 0.15 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1875[0m
+[32mmean completed tasks per ep: 0.75 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.3875[0m
+[32mmean completed tasks per ep: 1.55 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.3500[0m
+[32mmean completed tasks per ep: 1.40 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.3500[0m
+[32mmean completed tasks per ep: 1.40 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.3250[0m
+[32mmean completed tasks per ep: 1.30 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2875[0m
+[32mmean completed tasks per ep: 1.15 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.2625[0m
+[32mmean completed tasks per ep: 1.05 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.1250[0m
+[32mmean completed tasks per ep: 0.50 / 4[0m
+[36m[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet'][0m
+[32mtest_mean_score (kitchen success frac): 0.0625[0m
+[32mmean completed tasks per ep: 0.25 / 4[0m

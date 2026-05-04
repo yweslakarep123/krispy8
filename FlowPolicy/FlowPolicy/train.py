@@ -9,12 +9,10 @@ if __name__ == "__main__":
 
 import os
 
-# #region agent log
 # Force IPv4 for DNS resolution so Minari dataset downloads don't hang on
-# unreachable IPv6 CloudFront endpoints. No-op when the env var
-# FLOWP_FORCE_IPV4=0 is set.
-def _force_ipv4_and_log():
-    import socket, json, time
+# unreachable IPv6 CloudFront endpoints. No-op when FLOWP_FORCE_IPV4=0.
+def _force_ipv4():
+    import socket
     if os.environ.get("FLOWP_FORCE_IPV4", "1") == "0":
         return
     _orig_getaddrinfo = socket.getaddrinfo
@@ -22,88 +20,12 @@ def _force_ipv4_and_log():
     def _ipv4_getaddrinfo(host, *args, **kwargs):
         results = _orig_getaddrinfo(host, *args, **kwargs)
         ipv4 = [r for r in results if r[0] == socket.AF_INET]
-        try:
-            with open("/home/daffa/Documents/skpsi/.cursor/debug-6ac186.log",
-                      "a", encoding="utf-8") as _f:
-                _f.write(json.dumps({
-                    "sessionId": "6ac186",
-                    "runId": "dns-force-ipv4",
-                    "hypothesisId": "IPV6_HANG",
-                    "location": "train.py:getaddrinfo",
-                    "message": "resolved host",
-                    "timestamp": int(time.time() * 1000),
-                    "data": {
-                        "host": str(host),
-                        "n_all": len(results),
-                        "n_ipv4": len(ipv4),
-                        "first_ipv4": ipv4[0][4][0] if ipv4 else None,
-                    },
-                }) + "\n")
-        except Exception:
-            pass
         return ipv4 if ipv4 else results
 
     socket.getaddrinfo = _ipv4_getaddrinfo
 
 
-_force_ipv4_and_log()
-# #endregion
-
-
-# #region agent log
-def _debug_log_hydra_env():
-    import json, sys, time, os, platform
-    payload = {
-        "sessionId": "6ac186",
-        "runId": "hydra-import",
-        "hypothesisId": "H1_H2_H3",
-        "location": "train.py:pre-import-hydra",
-        "message": "pre-hydra-import environment snapshot",
-        "timestamp": int(time.time() * 1000),
-        "data": {
-            "python_version": sys.version,
-            "python_executable": sys.executable,
-            "platform": platform.platform(),
-            "sys_path_head": sys.path[:8],
-            "env_CONDA_DEFAULT_ENV": os.environ.get("CONDA_DEFAULT_ENV"),
-            "env_VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
-            "env_PYTHONPATH": os.environ.get("PYTHONPATH"),
-        },
-    }
-    try:
-        import hydra as _probe_hydra  # may raise
-        payload["data"]["hydra_version"] = getattr(_probe_hydra, "__version__", "unknown")
-        payload["data"]["hydra_file"] = getattr(_probe_hydra, "__file__", "unknown")
-        payload["data"]["hydra_import_ok"] = True
-    except Exception as exc:
-        payload["data"]["hydra_import_ok"] = False
-        payload["data"]["hydra_import_error_type"] = type(exc).__name__
-        payload["data"]["hydra_import_error_str"] = str(exc)[:400]
-        # also try to resolve where hydra would have been loaded from
-        try:
-            import importlib.util as _u
-            spec = _u.find_spec("hydra")
-            if spec is not None:
-                payload["data"]["hydra_spec_origin"] = getattr(spec, "origin", None)
-                payload["data"]["hydra_spec_search_locations"] = list(
-                    getattr(spec, "submodule_search_locations", []) or [])
-        except Exception as _inner:
-            payload["data"]["hydra_spec_probe_error"] = str(_inner)[:200]
-    try:
-        with open(
-            "/home/daffa/Documents/skpsi/.cursor/debug-6ac186.log",
-            "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-    return payload["data"].get("hydra_import_ok", False)
-
-
-_HYDRA_OK = _debug_log_hydra_env()
-if not _HYDRA_OK:
-    # Re-raise the real ImportError so the stack trace stays visible to the user
-    import hydra  # type: ignore  # noqa: F401
-# #endregion
+_force_ipv4()
 import hydra
 import torch
 import dill
@@ -133,7 +55,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
-
 
 def wandb_log_train_metrics(wandb_run, step_log, global_step):
     """Log metrics vs training global_step, not wandb's run-internal step counter.
@@ -218,6 +139,22 @@ def print_run_configuration_banner(
     sys.stdout.flush()
 
 
+def _agent_debug_log(run_id, hypothesis_id, location, message, data):
+    payload = {
+        "sessionId": "04e3ae",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open("/home/daffa/Documents/krispy8/.cursor/debug-04e3ae.log", "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+
 class TrainFlowPolicyWorkspace:
     include_keys = ['global_step', 'epoch']
     exclude_keys = tuple()
@@ -281,6 +218,19 @@ class TrainFlowPolicyWorkspace:
             if lastest_ckpt_path.is_file():
                 print(f"Resuming from checkpoint {lastest_ckpt_path}")
                 self.load_checkpoint(path=lastest_ckpt_path)
+                # #region agent log
+                _agent_debug_log(
+                    run_id="step-debug",
+                    hypothesis_id="S1_S2_S3_S4",
+                    location="train.py:resume-checkpoint:after-load",
+                    message="loaded checkpoint counters",
+                    data={
+                        "checkpoint_path": str(lastest_ckpt_path),
+                        "global_step_after_load": int(self.global_step),
+                        "epoch_after_load": int(self.epoch),
+                    },
+                )
+                # #endregion
 
         # configure dataset
         dataset: BaseDataset
@@ -383,149 +333,162 @@ class TrainFlowPolicyWorkspace:
         cprint("-----------------------------", "yellow")
         # configure logging
         _wb_cfg = OmegaConf.to_container(cfg, resolve=True)
-        # #region agent log
-        try:
-            import json as _json
-
-            _od_in_cfg = (
-                _wb_cfg.get("output_dir") if isinstance(_wb_cfg, dict) else None
-            )
-            with open(
-                "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
-                "a",
-                encoding="utf-8",
-            ) as _df:
-                _df.write(
-                    _json.dumps(
-                        {
-                            "sessionId": "f5ed5b",
-                            "hypothesisId": "H1_H4",
-                            "location": "train.py:wandb_pre_init",
-                            "message": "paths before wandb.init",
-                            "timestamp": int(time.time() * 1000),
-                            "data": {
-                                "self_output_dir": str(self.output_dir),
-                                "container_output_dir": (
-                                    str(_od_in_cfg) if _od_in_cfg is not None else None
-                                ),
-                                "hydra_runtime_output_dir": str(
-                                    HydraConfig.get().runtime.output_dir
-                                ),
-                                "logging_resume": bool(
-                                    OmegaConf.select(cfg, "logging.resume")
-                                ),
-                            },
-                        }
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
-        # #endregion
+        _agent_debug_log(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H3_H4_H5",
+            location="train.py:wandb.init:before",
+            message="before wandb.init",
+            data={
+                "output_dir": str(self.output_dir),
+                "logging_group": str(cfg.logging.group),
+                "logging_name": str(cfg.logging.name),
+                "logging_id": str(getattr(cfg.logging, "id", None)),
+                "logging_resume": str(getattr(cfg.logging, "resume", None)),
+                "hydra_output_dir": str(HydraConfig.get().runtime.output_dir),
+            },
+        )
         wandb_run = wandb.init(
             dir=str(self.output_dir),
             config=_wb_cfg,
             **cfg.logging
         )
-        # #region agent log
+        _agent_debug_log(
+            run_id="pre-fix",
+            hypothesis_id="H1_H2_H3_H4_H5",
+            location="train.py:wandb.init:after",
+            message="after wandb.init",
+            data={
+                "run_id": str(getattr(wandb_run, "id", None)),
+                "run_name": str(getattr(wandb_run, "name", None)),
+                "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                "run_dir": str(getattr(wandb_run, "dir", None)),
+            },
+        )
         try:
-            import json as _json
-
-            with open(
-                "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
-                "a",
-                encoding="utf-8",
-            ) as _df:
-                _df.write(
-                    _json.dumps(
-                        {
-                            "sessionId": "f5ed5b",
-                            "hypothesisId": "H5",
-                            "location": "train.py:wandb_post_init",
-                            "message": "wandb.config output_dir after init",
-                            "timestamp": int(time.time() * 1000),
-                            "data": {
-                                "wandb_config_output_dir": wandb.config.get(
-                                    "output_dir"
-                                ),
-                                "self_output_dir": str(self.output_dir),
-                            },
-                        }
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
-        # #endregion
-        try:
-            wandb.config.update(
-                {"output_dir": self.output_dir},
-                allow_val_change=True,
+            existing_output_dir = wandb.config.get("output_dir", None)
+            new_output_dir = str(self.output_dir)
+            should_update_output_dir = (
+                existing_output_dir is None
+                or str(existing_output_dir) == new_output_dir
             )
-        except Exception as _wandb_upd_err:
-            # #region agent log
-            try:
-                import json as _json
-
-                with open(
-                    "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
-                    "a",
-                    encoding="utf-8",
-                ) as _df:
-                    _df.write(
-                        _json.dumps(
-                            {
-                                "sessionId": "f5ed5b",
-                                "hypothesisId": "H2_H3_H5",
-                                "location": "train.py:wandb_update_failed",
-                                "message": "config.update raised",
-                                "timestamp": int(time.time() * 1000),
-                                "data": {
-                                    "error_type": type(_wandb_upd_err).__name__,
-                                    "error_str": str(_wandb_upd_err)[:500],
-                                },
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="H1_H2_H3_H4_H5",
+                location="train.py:wandb.config.update:decision",
+                message="decide whether to update output_dir",
+                data={
+                    "existing_output_dir": str(existing_output_dir),
+                    "new_output_dir": new_output_dir,
+                    "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                    "should_update_output_dir": should_update_output_dir,
+                },
+            )
+            if should_update_output_dir:
+                wandb.config.update(
+                    {"output_dir": new_output_dir},
+                    allow_val_change=True,
+                )
+                _agent_debug_log(
+                    run_id="post-fix",
+                    hypothesis_id="H1_H2_H3_H4_H5",
+                    location="train.py:wandb.config.update:applied",
+                    message="output_dir update applied",
+                    data={"output_dir": new_output_dir},
+                )
+            else:
+                _agent_debug_log(
+                    run_id="post-fix",
+                    hypothesis_id="H1_H2_H3_H4_H5",
+                    location="train.py:wandb.config.update:skipped",
+                    message="output_dir update skipped to avoid config mutation on resumed run",
+                    data={
+                        "existing_output_dir": str(existing_output_dir),
+                        "new_output_dir": new_output_dir,
+                    },
+                )
+        except Exception as exc:
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="H1_H2_H3_H4_H5",
+                location="train.py:wandb.config.update:exception",
+                message="wandb.config.update failed",
+                data={
+                    "exc_type": type(exc).__name__,
+                    "exc_message": str(exc),
+                    "existing_output_dir": str(wandb.config.get("output_dir", None)),
+                    "new_output_dir": str(self.output_dir),
+                },
+            )
             raise
-        else:
-            # #region agent log
-            try:
-                import json as _json
-
-                with open(
-                    "/home/daffa/Documents/krispy8/.cursor/debug-f5ed5b.log",
-                    "a",
-                    encoding="utf-8",
-                ) as _df:
-                    _df.write(
-                        _json.dumps(
-                            {
-                                "sessionId": "f5ed5b",
-                                "runId": "post-fix",
-                                "hypothesisId": "VERIFY",
-                                "location": "train.py:wandb_post_update",
-                                "message": "output_dir synced after resume",
-                                "timestamp": int(time.time() * 1000),
-                                "data": {
-                                    "wandb_config_output_dir": str(
-                                        wandb.config.get("output_dir")
-                                    ),
-                                },
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
 
         wandb.define_metric("train/step", hidden=True)
         wandb.define_metric("train/*", step_metric="train/step")
+
+        try:
+            wandb_summary_step = wandb_run.summary.get("_step", None)
+        except Exception:
+            wandb_summary_step = None
+        _agent_debug_log(
+            run_id="step-debug",
+            hypothesis_id="S1_S2_S3_S4",
+            location="train.py:wandb-step:after-init",
+            message="wandb step state after init",
+            data={
+                "local_global_step": int(self.global_step),
+                "wandb_run_step_attr": str(getattr(wandb_run, "step", None)),
+                "wandb_summary_step": str(wandb_summary_step),
+                "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+            },
+        )
+        wandb_step_after_init = getattr(wandb_run, "step", None)
+        if wandb_step_after_init is not None:
+            try:
+                wandb_step_after_init = int(wandb_step_after_init)
+            except Exception:
+                wandb_step_after_init = None
+        if (
+            bool(getattr(wandb_run, "resumed", False))
+            and wandb_step_after_init is not None
+            and int(self.global_step) < wandb_step_after_init
+        ):
+            prev_global_step = int(self.global_step)
+            self.global_step = wandb_step_after_init
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="S1_S2_S3_S4",
+                location="train.py:wandb-step:sync",
+                message="synced local global_step to resumed wandb step",
+                data={
+                    "prev_global_step": prev_global_step,
+                    "synced_global_step": int(self.global_step),
+                    "wandb_step_after_init": wandb_step_after_init,
+                },
+            )
+        else:
+            _agent_debug_log(
+                run_id="post-fix",
+                hypothesis_id="S1_S2_S3_S4",
+                location="train.py:wandb-step:no-sync",
+                message="no global_step sync needed",
+                data={
+                    "local_global_step": int(self.global_step),
+                    "wandb_step_after_init": str(wandb_step_after_init),
+                    "run_resumed": bool(getattr(wandb_run, "resumed", False)),
+                },
+            )
+
+        # Resume monotonic steps when checkpoint is behind server-side wandb step.
+        try:
+            wandb_step = int(getattr(wandb_run, "step", 0) or 0)
+        except Exception:
+            wandb_step = 0
+        if getattr(wandb_run, "resumed", False) and wandb_step >= self.global_step:
+            cprint(
+                f"[WandB] resumed run at server step {wandb_step}; advancing "
+                f"local global_step {self.global_step} -> {wandb_step + 1} "
+                f"to keep log steps monotonically increasing.",
+                "yellow")
+            self.global_step = wandb_step + 1
 
         # configure checkpoint
         topk_manager = TopKCheckpointManager(
@@ -614,6 +577,17 @@ class TrainFlowPolicyWorkspace:
                     is_last_batch = (batch_idx == (len(train_dataloader)-1))
                     if not is_last_batch:
                         # log of last step is combined with validation and rollout
+                        if batch_idx == 0 and local_epoch_idx == 0:
+                            _agent_debug_log(
+                                run_id="step-debug",
+                                hypothesis_id="S1_S2_S3_S4",
+                                location="train.py:wandb.log:first-batch",
+                                message="first batch log step values",
+                                data={
+                                    "local_global_step_before_log": int(self.global_step),
+                                    "wandb_run_step_attr_before_log": str(getattr(wandb_run, "step", None)),
+                                },
+                            )
                         wandb_log_train_metrics(
                             wandb_run, step_log, self.global_step
                         )
@@ -768,12 +742,35 @@ class TrainFlowPolicyWorkspace:
         # load the latest checkpoint
         
         cfg = copy.deepcopy(self.cfg)
-        
-        lastest_ckpt_path = self.get_checkpoint_path(tag="latest")
-        if lastest_ckpt_path.is_file():
-            cprint(f"Resuming from checkpoint {lastest_ckpt_path}", 'magenta')
-            self.load_checkpoint(path=lastest_ckpt_path)
-        
+
+        # Prioritas sumber checkpoint (fail-fast, no silent skip):
+        #   1) cfg.eval.checkpoint_path (override eksplisit dari CLI Hydra)
+        #   2) self.output_dir/checkpoints/latest.ckpt
+        explicit_ckpt = None
+        try:
+            explicit_ckpt = cfg.get("eval", {}).get("checkpoint_path", None)
+        except Exception:
+            explicit_ckpt = None
+
+        if explicit_ckpt:
+            lastest_ckpt_path = pathlib.Path(str(explicit_ckpt)).expanduser()
+        else:
+            lastest_ckpt_path = self.get_checkpoint_path(tag="latest")
+
+        if not lastest_ckpt_path.is_file():
+            raise FileNotFoundError(
+                "Tidak menemukan checkpoint untuk eval.\n"
+                f"  Dicari di: {lastest_ckpt_path}\n"
+                "Pastikan training sudah menyimpan checkpoint "
+                "(`checkpoint.save_ckpt=True`) lalu salah satu:\n"
+                "  - arahkan eval ke run_dir training yang benar "
+                "(`hydra.run.dir=<train_run_dir>`), atau\n"
+                "  - beri path ckpt langsung lewat "
+                "`+eval.checkpoint_path=/path/ke/latest.ckpt`.")
+
+        cprint(f"Resuming from checkpoint {lastest_ckpt_path}", 'magenta')
+        self.load_checkpoint(path=lastest_ckpt_path)
+
         # configure env
         env_runner: BaseRunner
         env_runner = hydra.utils.instantiate(
