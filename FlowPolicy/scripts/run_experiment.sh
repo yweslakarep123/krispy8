@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Wrapper eksperimen penuh (seed × profile × CV × random HP).
+#
+# Profil ``standard`` / ``minimal`` di sini: split mengikuti lipatan CV
+# (train/val episode lists), BUKAN shuffle window 70/20/10 — windowing hanya
+# untuk train tanpa daftar indeks (mis. train_kitchen.sh). Noise & stride
+# sampler tetap mengikuti profil.
+#
 # Contoh:
 #   bash scripts/run_experiment.sh 0 --dry-run
 #   bash scripts/run_experiment.sh 0 --output-dir data/outputs/experiment --n-configs 10

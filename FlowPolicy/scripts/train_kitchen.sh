@@ -13,6 +13,11 @@
 #
 # Argumen: seed gpu [DEBUG] [save_ckpt] [preprocessing_profile]
 #
+# preprocessing_profile:
+#   standard — sliding-window buffer + split 70/20/10 + augmentasi noise (yaml).
+#   minimal  — sama, tanpa Gaussian noise.
+#   raw      — tanpa windowing (set task.dataset.preprocess.sliding_window=true untuk opt-in), stride horizon, tanpa noise.
+#
 set -euo pipefail
 
 seed=${1:-0}
