@@ -61,14 +61,14 @@ dataset:
   obs_noise_std: 0.01
   action_noise_std: 0.0
   normalizer_mode: limits
-  # Sliding-window + split 70/20/10: otomatis ON untuk preprocessing_profile
-  # ``standard`` | ``minimal`` jika train/val_episode_indices tidak diset.
-  # Parameter di bawah (window_ratio, train_ratio, …) mengatur windowing.
-  # ``enabled`` hanya relevan untuk ``raw`` | ``legacy_minimal`` (opt-in).
+  # Sliding-window + split 70/20/10: untuk preprocessing_profile ``standard`` |
+  # ``minimal`` diaktifkan secara default di kode (tanpa perlu kunci di bawah).
+  # Set ``sliding_window: false`` untuk ablasi. Untuk ``raw`` / ``legacy_minimal``,
+  # jangan set ``sliding_window`` di yaml kecuali ingin opt-in; pakai
+  # ``enabled: true`` atau CLI ``task.dataset.preprocess.sliding_window=true``.
   preprocess:
-    # Untuk standard | minimal: default true (window 70/20/10). Set false untuk ablasi.
-    sliding_window: true
-    # Legacy toggle windowing untuk raw | legacy_minimal bila sliding_window tidak diset.
+    # Jangan set ``sliding_window: true`` di sini — akan memaksa windowing
+    # juga untuk profil ``raw``. Ablasi: ``sliding_window: false`` dengan standard.
     enabled: false
     window_ratio: 0.25
     stride: 1

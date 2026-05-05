@@ -6,6 +6,8 @@ flow-matching training + single-step inference math unchanged.
 """
 
 from typing import Dict, Sequence
+import json
+import time
 import numpy as np
 import torch
 
@@ -194,6 +196,40 @@ class FlowPolicyLowdim(BasePolicy):
             t = torch.ones(z.shape[0], device=noise.device) * num_t
             pred = self.model(z, t * 99, local_cond=local_cond, global_cond=global_cond)
             sigma_t = sde.sigma_t(num_t)
+            # #region agent log
+            _den = float(
+                2 * (sde.noise_scale ** 2) * ((1.0 - float(num_t)) ** 2))
+            if isinstance(sigma_t, torch.Tensor):
+                _st = float(sigma_t.detach().mean().cpu())
+            else:
+                _st = float(sigma_t)
+            _payload = {
+                "sessionId": "e5ee70",
+                "hypothesisId": "H1-H6",
+                "location": "flowpolicy_lowdim.py:predict_action",
+                "message": "inference step denom/sigma",
+                "data": {
+                    "eps": float(eps),
+                    "sample_N": int(sde.sample_N),
+                    "i": int(i),
+                    "num_t": float(num_t),
+                    "one_minus_num_t": float(1.0 - float(num_t)),
+                    "denom": _den,
+                    "sigma_t_scalar": _st,
+                },
+                "timestamp": int(time.time() * 1000),
+                "runId": "pre-fix",
+            }
+            try:
+                with open(
+                    "/home/daffa/Documents/krispy8/.cursor/debug-e5ee70.log",
+                    "a",
+                    encoding="utf-8",
+                ) as _df:
+                    _df.write(json.dumps(_payload) + "\n")
+            except OSError:
+                pass
+            # #endregion
             pred_sigma = pred + (sigma_t ** 2) / (
                 2 * (sde.noise_scale ** 2) * ((1. - num_t) ** 2)
             ) * (
