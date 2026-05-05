@@ -1,84 +1,0 @@
-[LowdimEncoder] state_dim=70 out_channel=64 hidden_dims=(1024, 1024)
-[2026-05-04 04:18:55,681][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 7.466753e+07
-----------------------------------
-Class name: FlowPolicyLowdim
-  Number of parameters: 75.8595M
-   _dummy_variable: 0.0000M (0.00%)
-   obs_encoder: 1.1920M (1.57%)
-   model: 74.6675M (98.43%)
-   mask_generator: 0.0000M (0.00%)
-----------------------------------
-[KitchenDataset] preprocessing_profile=minimal: sliding stride 1, no Gaussian augmentation
-[KitchenDataset] loading minari dataset 'D4RL/kitchen/complete-v2'
-[KitchenDataset] loaded 19 episodes, 4209 total steps
-[KitchenDataset] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
-[KitchenDataset] order filter: tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'], skipped=0 episode(s) not matching order
-[KitchenDataset] agent_pos_dim=70 action_dim=9 robot_obs_dim(for noise)=59
-[2026-05-04 04:18:56,500][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
-AdroitHandRelocateDense-v1, AdroitHandHammerDense-v1, AdroitHandDoorDense-v1 environment's reward functions were updated in v1.2.1 without an environment version update. Therefore, use gymnasium-robotics==1.2.0 for v1 reproducibility or use v2 in gymnasium-robotics>=1.4.3. See https://github.com/Farama-Foundation/Gymnasium-Robotics/pull/220 for more details
------------------------------
-[WandB] group: experiment_cv
-[WandB] name: exp_cfg00_seed0_minimal_fold0
------------------------------
-wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id 8z1fh44h.
-wandb: Tracking run with wandb version 0.26.1
-wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
-wandb: Run data is saved locally in /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0/wandb/offline-run-20260504_041856-8z1fh44h
-Epochs:   0%|          | 0/5000 [00:00<?, ?it/s]
-Training epoch 0:   0%|          | 0/25 [00:00<?, ?it/s][A
-Training epoch 0:  24%|██▍       | 6/25 [00:01<00:03,  5.85it/s, loss=3.22e-6][A
-Training epoch 0:  64%|██████▍   | 16/25 [00:02<00:01,  7.93it/s, loss=3.35e-6][A
-                                                                               [A
-Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s][A[KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
-
-Eval FrankaKitchen-v1 [kitchen_complete]:  25%|██▌       | 5/20 [00:06<00:18,  1.21s/it][A
-Eval FrankaKitchen-v1 [kitchen_complete]:  50%|█████     | 10/20 [00:11<00:11,  1.14s/it][A
-Eval FrankaKitchen-v1 [kitchen_complete]:  75%|███████▌  | 15/20 [00:17<00:05,  1.14s/it][A
-Eval FrankaKitchen-v1 [kitchen_complete]: 100%|██████████| 20/20 [00:22<00:00,  1.14s/it][A
-                                                                                         [Atest_mean_score (kitchen success frac): 0.0000
-mean completed tasks per ep: 0.00 / 4
-wandb: Encoding video...
-Epochs:   0%|          | 1/5000 [00:28<39:52:05, 28.71s/it, train=0.0000]
-Training epoch 1:   0%|          | 0/25 [00:00<?, ?it/s][A
-Training epoch 1:  36%|███▌      | 9/25 [00:01<00:01,  8.31it/s, loss=3.11e-6][A
-Training epoch 1:  76%|███████▌  | 19/25 [00:02<00:00,  8.82it/s, loss=2.86e-6][A
-                                                                               [AEpochs:   0%|          | 2/5000 [00:31<18:43:42, 13.49s/it, train=0.0000]
-Training epoch 2:   0%|          | 0/25 [00:00<?, ?it/s][A
-                                                        [AEpochs:   0%|          | 2/5000 [00:32<22:19:00, 16.07s/it, train=0.0000]
-Traceback (most recent call last):
-  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 859, in <module>
-    main()
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
-    _run_hydra(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-    _run_app(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
-    run_and_report(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
-    return func()
-           ^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
-    lambda: hydra.run(
-            ^^^^^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 119, in run
-    ret = run_job(
-          ^^^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
-    ret.return_value = task_function(task_cfg)
-                       ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 856, in main
-    workspace.run()
-  File "/home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/train.py", line 500, in run
-    loss.backward()
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
-    torch.autograd.backward(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
-    _engine_run_backward(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
-    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-KeyboardInterrupt
-[1;34mwandb[0m: 
-[1;34mwandb[0m: You can sync this run to the cloud by running:
-[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/krispy8/FlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0/wandb/offline-run-20260504_041856-8z1fh44h[0m
-[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/experiment/runs/cfg00_seed0_minimal_fold0/wandb/offline-run-20260504_041856-8z1fh44h/logs[0m

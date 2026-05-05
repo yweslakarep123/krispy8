@@ -1,68 +1,0 @@
-# cmd: /home/daffa/miniforge3/envs/flowp/bin/python train.py --config-name=flowpolicy task=kitchen_complete hydra.run.dir=/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_06_seed0 training.seed=0 training.device=cuda training.debug=False exp_name=random_search logging.name=random_search_cfg_06_seed0 logging.mode=offline checkpoint.save_ckpt=True training.num_epochs=1000 optimizer.lr=0.001 dataloader.batch_size=512 val_dataloader.batch_size=512 policy.Conditional_ConsistencyFM.num_segments=3 policy.Conditional_ConsistencyFM.eps=1 policy.Conditional_ConsistencyFM.delta=0.0001 n_action_steps=4 n_obs_steps=8
-[LowdimEncoder] state_dim=70 out_channel=64 hidden_dims=(256, 256)
-[2026-04-21 13:32:25,384][flow_policy_3d.model.flow.conditional_unet1d][INFO] - number of parameters: 7.086452e+07
-----------------------------------
-Class name: FlowPolicyLowdim
-  Number of parameters: 70.9660M
-   _dummy_variable: 0.0000M (0.00%)
-   obs_encoder: 0.1014M (0.14%)
-   model: 70.8645M (99.86%)
-   mask_generator: 0.0000M (0.00%)
-----------------------------------
-[KitchenDataset] loading minari dataset 'D4RL/kitchen/complete-v2'
-[KitchenDataset] loaded 19 episodes, 4209 total steps
-[KitchenDataset] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
-[KitchenDataset] order filter: tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'], skipped=0 episode(s) not matching order
-[KitchenDataset] agent_pos_dim=70 action_dim=9 robot_obs_dim(for noise)=59
-[2026-04-21 13:32:26,226][OpenGL.acceleratesupport][INFO] - No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
-wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id 6b9c3nwl.
-wandb: Tracking run with wandb version 0.26.0
-wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
-wandb: Run data is saved locally in /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_06_seed0/wandb/offline-run-20260421_133226-6b9c3nwl
------------------------------
-[WandB] group: random_search
-[WandB] name: random_search_cfg_06_seed0
------------------------------
-Training epoch 0:   0%|          | 0/8 [00:00<?, ?it/s]Training epoch 0:  38%|███▊      | 3/8 [00:01<00:02,  2.44it/s, loss=0]Training epoch 0:  88%|████████▊ | 7/8 [00:02<00:00,  3.17it/s, loss=0]                                                                       Eval FrankaKitchen-v1 [kitchen_complete]:   0%|          | 0/20 [00:00<?, ?it/s]                                                                                [KitchenRunner] goal keys order: ['microwave', 'kettle', 'light switch', 'slide cabinet']
-Error executing job with overrides: ['task=kitchen_complete', 'training.seed=0', 'training.device=cuda', 'training.debug=False', 'exp_name=random_search', 'logging.name=random_search_cfg_06_seed0', 'logging.mode=offline', 'checkpoint.save_ckpt=True', 'training.num_epochs=1000', 'optimizer.lr=0.001', 'dataloader.batch_size=512', 'val_dataloader.batch_size=512', 'policy.Conditional_ConsistencyFM.num_segments=3', 'policy.Conditional_ConsistencyFM.eps=1', 'policy.Conditional_ConsistencyFM.delta=0.0001', 'n_action_steps=4', 'n_obs_steps=8']
-Traceback (most recent call last):
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 607, in <module>
-    main()
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/main.py", line 94, in decorated_main
-    _run_hydra(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-    _run_app(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 457, in _run_app
-    run_and_report(
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 223, in run_and_report
-    raise ex
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
-    return func()
-           ^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
-    lambda: hydra.run(
-            ^^^^^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/_internal/hydra.py", line 132, in run
-    _ = ret.return_value
-        ^^^^^^^^^^^^^^^^
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 260, in return_value
-    raise self._return_value
-  File "/home/daffa/miniforge3/envs/flowp/lib/python3.12/site-packages/hydra/core/utils.py", line 186, in run_job
-    ret.return_value = task_function(task_cfg)
-                       ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 604, in main
-    workspace.run()
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/train.py", line 357, in run
-    runner_log = env_runner.run(policy)
-                 ^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/flow_policy_3d/env_runner/kitchen_runner.py", line 208, in run
-    action_dict = policy.predict_action(obs_dict_input)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/flow_policy_3d/policy/flowpolicy_lowdim.py", line 197, in predict_action
-    pred_sigma = pred + (sigma_t ** 2) / (
-                        ^^^^^^^^^^^^^^^^^^
-ZeroDivisionError: float division by zero
-[1;34mwandb[0m: 
-[1;34mwandb[0m: You can sync this run to the cloud by running:
-[1;34mwandb[0m: [1mwandb sync /home/daffa/Documents/skpsi/FlowPolicy/FlowPolicy/data/outputs/random_search/cfg_06_seed0/wandb/offline-run-20260421_133226-6b9c3nwl[0m
-[1;34mwandb[0m: Find logs at: [1;35mFlowPolicy/FlowPolicy/data/outputs/random_search/cfg_06_seed0/wandb/offline-run-20260421_133226-6b9c3nwl/logs[0m
