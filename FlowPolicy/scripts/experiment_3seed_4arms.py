@@ -103,7 +103,7 @@ def _build_train_cmd(
         "checkpoint.save_ckpt=True",
         "training.resume=False",
     ]
-    cmd.append(format_override("task.dataset.preprocess.enabled", preprocess))
+    cmd.append(format_override("task.dataset.preprocess.sliding_window", preprocess))
     return cmd
 
 

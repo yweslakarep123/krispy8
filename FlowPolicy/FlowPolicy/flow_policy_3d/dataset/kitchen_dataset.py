@@ -17,27 +17,32 @@ Features on top of the original implementation:
    19 episodes pass, but the filter is a safeguard (and enables using
    mixed/partial datasets later).
 
-3. Optional sliding-window preprocessing (`preprocess.enabled=true`):
-   each demonstration of length T is sliced into overlapping windows of
-   length `round(window_ratio * T)` with the configured `stride`. Each
-   window becomes an independent "mini-episode" in the replay buffer, and
-   the whole collection of windows is shuffled then split train/val/test
-   (default 70/20/10). When `preprocess.enabled=false`, the original
-   episode-level pipeline is used (single `val_ratio` episode split, no
-   test split).
+3. Sliding-window preprocessing + 70/20/10 split is **on by default** for
+   profiles ``standard`` and ``minimal`` when **not** using explicit
+   ``train_episode_indices`` / ``val_episode_indices`` (e.g. plain
+   ``train_kitchen.sh``). Each demonstration of length T is sliced into
+   overlapping windows of length ``round(window_ratio * T)`` with the
+   configured ``stride``. Each window becomes an independent "mini-episode",
+   windows are shuffled (``preprocess.split_seed``) then split train/val/test
+   (default 70/20/10). For ``raw`` / ``legacy_minimal``, or when CV episode
+   lists are set, windowing is **off** (CV cannot combine with
+   ``preprocess.sliding_window=false``. ``raw`` / ``legacy_minimal`` may opt
+   into windowing via ``preprocess.sliding_window=true`` or legacy
+   ``preprocess.enabled=true`` only when **not** using episode index lists.
 
-4. Optional augmentation (training split only, after split):
+5. Optional augmentation (training split only, after split):
    - `obs_noise_std`: Gaussian noise on the 59-dim `observation` part of
      `agent_pos` (not applied to the goal suffix which is static).
    - `action_noise_std`: Gaussian noise on the action target.
 
-4. ``preprocessing_profile`` (Hydra ``task.dataset.preprocessing_profile``):
-   - ``standard`` (default): sliding windows (stride 1), train/val split via
-     ``val_ratio`` **or** explicit ``train_episode_indices`` /
-     ``val_episode_indices``, augmentation from ``obs_noise_std`` /
-     ``action_noise_std``.
-   - ``minimal``: sliding stride 1, same splits as ``standard``, **no**
-     Gaussian augmentation (noise std forced to 0).
+6. ``preprocessing_profile`` (Hydra ``task.dataset.preprocessing_profile``):
+   - ``standard`` (default): with **no** episode-index lists — sliding-window
+     buffer + 70/20/10 split + ``SequenceSampler`` stride 1 + augmentation
+     from ``obs_noise_std`` / ``action_noise_std``. With **CV episode lists**,
+     split follows those indices (no window shuffle); stride 1 and noise
+     still apply.
+   - ``minimal``: same as ``standard`` for windowing/split, **no** Gaussian
+     augmentation (noise std forced to 0).
    - ``legacy_minimal``: ablation lama — stride = ``horizon`` (jendela tidak
      overlap), ``val_ratio`` dipaksa 0, tanpa noise. Tidak kompatibel dengan
      daftar episode eksplisit (akan memicu ``ValueError``).
@@ -46,7 +51,7 @@ Features on top of the original implementation:
      Boleh dipakai bersama ``train_episode_indices`` / ``val_episode_indices``
      (mis. CV): stride horizon tetap dipakai.
 
-5. **Episode-level CV (opsional):** jika ``train_episode_indices`` dan
+7. **Episode-level CV (opsional):** jika ``train_episode_indices`` dan
    ``val_episode_indices`` keduanya diset (daftar indeks episode buffer 0..N-1),
    ``val_ratio`` diabaikan dan mask diambil dari daftar tersebut.
 """
@@ -328,9 +333,39 @@ class KitchenDataset(BaseDataset):
         self.normalizer_mode = normalizer_mode
         self._is_train_split = True  # val/test split flips this to False in copy
 
-        # Sliding-window preprocessing config (opt-in).
+        # Sliding-window + 70/20/10: default ON for ``standard`` / ``minimal``
+        # without explicit train/val episode lists. Opt out via
+        # ``preprocess.sliding_window=false`` (ablasi). CV / explicit indices
+        # always use full-episode split; ``preprocess.enabled=true`` or
+        # ``preprocess.sliding_window=true`` with episode lists is forbidden.
+        # For ``raw`` / ``legacy_minimal``, windowing follows ``sliding_window``
+        # if set, else legacy ``preprocess.enabled``.
         preprocess = dict(preprocess) if preprocess else {}
-        self.preprocess_enabled = bool(preprocess.get('enabled', False))
+        yaml_preprocess_flag = bool(preprocess.get('enabled', False))
+        sliding_explicit = preprocess.get('sliding_window', None)
+        if use_episode_lists:
+            if yaml_preprocess_flag:
+                raise ValueError(
+                    "task.dataset.preprocess.enabled=true is incompatible with "
+                    "train_episode_indices / val_episode_indices. "
+                    "Use full-episode CV split, or omit episode lists for "
+                    "sliding-window 70/20/10.")
+            if sliding_explicit is not None and bool(sliding_explicit):
+                raise ValueError(
+                    "task.dataset.preprocess.sliding_window=true is incompatible "
+                    "with train_episode_indices / val_episode_indices.")
+            self.preprocess_enabled = False
+        elif self.preprocessing_profile in ('standard', 'minimal'):
+            if sliding_explicit is not None:
+                self.preprocess_enabled = bool(sliding_explicit)
+            else:
+                self.preprocess_enabled = True
+        else:
+            if sliding_explicit is not None:
+                self.preprocess_enabled = bool(sliding_explicit)
+            else:
+                self.preprocess_enabled = yaml_preprocess_flag
+
         self.preprocess_window_ratio = float(preprocess.get('window_ratio', 0.25))
         self.preprocess_stride = int(preprocess.get('stride', 1))
         self.preprocess_train_ratio = float(preprocess.get('train_ratio', 0.70))
@@ -475,6 +510,14 @@ class KitchenDataset(BaseDataset):
             for i in self._val_epi:
                 val_mask[int(i)] = True
             self._val_episode_mask = val_mask
+            if self.preprocessing_profile in ('standard', 'minimal'):
+                cprint(
+                    "[KitchenDataset] CV / explicit episode indices: "
+                    "sliding-window 70/20/10 off; split follows "
+                    "train_episode_indices / val_episode_indices (stride & "
+                    "noise still follow preprocessing_profile).",
+                    "cyan",
+                )
         else:
             val_mask = get_val_mask(
                 n_episodes=replay_buffer.n_episodes,
@@ -484,8 +527,8 @@ class KitchenDataset(BaseDataset):
             train_mask = ~val_mask
             test_mask = np.zeros_like(val_mask)
             cprint(
-                f"[KitchenDataset] preprocessing disabled: "
-                f"episodes train/val/test="
+                f"[KitchenDataset] episode-level split (no sliding-window "
+                f"buffer): episodes train/val/test="
                 f"{int(train_mask.sum())}/{int(val_mask.sum())}/0",
                 'cyan')
             train_mask = downsample_mask(
@@ -561,7 +604,7 @@ class KitchenDataset(BaseDataset):
 
     def get_test_dataset(self):
         """Return the held-out test split (only populated when
-        `preprocess.enabled=true`)."""
+        `preprocess.sliding_window=true` / legacy `preprocess.enabled=true`)."""
         if not self.preprocess_enabled or not np.any(self.test_mask):
             return None
         return self._make_split(self.test_mask)

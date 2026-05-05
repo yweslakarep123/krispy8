@@ -8,6 +8,10 @@ terhubung ke run atau checkpoint lain.
 Menulis ``configs.json``, ``cv_splits.json``, menjalankan ``train.py`` +
 ``infer_kitchen.py`` per sel, lalu ``summarize.py`` + ``plot_results.py``.
 
+Profil ``standard`` / ``minimal``: lipatan CV memakai indeks episode penuh
+(tanpa sliding-window 70/20/10). Windowing + 70/20/10 hanya untuk training
+tanpa ``train_episode_indices`` / ``val_episode_indices`` (mis. ``train_kitchen.sh``).
+
 Contoh:
   cd FlowPolicy
   python scripts/run_experiment.py --gpu 0 --dry-run

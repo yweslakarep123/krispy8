@@ -65,11 +65,13 @@ cd FlowPolicy
 bash scripts/train_kitchen.sh 0 0 FALSE True raw
 ```
 
-2. **Training kitchen, dengan preprocessing** (`standard` — sliding + augmentasi default):
+2. **Training kitchen, dengan preprocessing penuh** (`standard` — sliding-window buffer, split window 70/20/10, augmentasi noise bawaan yaml):
 
 ```bash
 bash scripts/train_kitchen.sh 0 0 FALSE True standard
 ```
+
+**Catatan CV:** `run_experiment` memakai `train_episode_indices` / `val_episode_indices`; untuk profil `standard` / `minimal` **tidak** memakai split window 70/20/10 (hanya split lipatan episode), tetapi noise dan stride sampler tetap mengikuti profil. Window 70/20/10 hanya untuk `train_kitchen` tanpa indeks episode.
 
 3. **Eksperimen CV (orkestrator), tanpa preprocessing** — hanya profil `raw`; keluaran terpisah agar mudah dibandingkan:
 
@@ -77,7 +79,7 @@ bash scripts/train_kitchen.sh 0 0 FALSE True standard
 bash scripts/run_experiment.sh 0 --profiles raw --output-dir data/outputs/experiment_raw
 ```
 
-4. **Eksperimen CV, dengan preprocessing** — hanya profil `standard`:
+4. **Eksperimen CV, profil `standard`** — stride & noise seperti `standard`, split mengikuti lipatan CV (bukan 70/20/10 window):
 
 ```bash
 bash scripts/run_experiment.sh 0 --profiles standard --output-dir data/outputs/experiment_standard
@@ -129,12 +131,12 @@ Override via Hydra, mis. `task.dataset.obs_noise_std=0.02`.
 
 ## Profil preprocessing (`task.dataset.preprocessing_profile`)
 
-| Profil | Sliding (stride) | Noise | Split train/val |
-|--------|------------------|-------|------------------|
-| `standard` | 1 (overlap) | ya (default yaml) | `val_ratio` atau indeks CV |
-| `minimal` | 1 (overlap) | tidak | idem |
-| `raw` | `horizon` (tanpa overlap) | tidak | tanpa holdout acak jika **tanpa** indeks episode; dengan indeks CV, split mengikuti daftar itu |
-| `legacy_minimal` | `horizon` | tidak | `val_ratio=0` saja; **tidak** kompatibel dengan indeks episode eksplisit |
+| Profil | Sliding-window buffer + 70/20/10 | `SequenceSampler` stride | Noise | Split train/val |
+|--------|-----------------------------------|--------------------------|-------|-----------------|
+| `standard` | ya, jika **tanpa** indeks episode; **tidak** jika CV / indeks eksplisit | 1 (overlap) kecuali `raw` | ya (default yaml) | `val_ratio` (tanpa window) atau indeks CV / window 70/20/10 bila windowing aktif |
+| `minimal` | idem `standard` | 1 | tidak | idem |
+| `raw` | hanya jika `preprocess.sliding_window=true` atau legacy `preprocess.enabled=true` | `horizon` | tidak | tanpa holdout acak jika **tanpa** indeks episode; dengan indeks CV, split mengikuti daftar |
+| `legacy_minimal` | hanya jika `preprocess.sliding_window=true` atau legacy `enabled` | `horizon` | tidak | `val_ratio=0` saja; **tidak** kompatibel dengan indeks episode eksplisit |
 
 Eksperimen hanya jalur “tanpa preprocessing” (artian di atas):  
 `bash scripts/run_experiment.sh 0 --profiles raw`

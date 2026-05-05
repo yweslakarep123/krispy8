@@ -108,7 +108,7 @@ def main() -> int:
         "logging.mode=offline",
         "checkpoint.save_ckpt=True",
         "training.resume=False",
-        format_override("task.dataset.preprocess.enabled", bool(args.preprocess)),
+        format_override("task.dataset.preprocess.sliding_window", bool(args.preprocess)),
     ]
     for k, v in params.items():
         cmd.append(format_override(k, v))
